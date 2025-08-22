@@ -16,9 +16,8 @@ module.exports = function(sequelize, DataTypes) {
       allowNull: true
     },
     status: {
-      type: DataTypes.ENUM('ONGOING','COMPLETED','HIATUS','DROPPED'),
-      allowNull: false,
-      defaultValue: "ONGOING"
+      type: DataTypes.STRING(255),
+      allowNull: false
     },
     total_view: {
       type: DataTypes.BIGINT.UNSIGNED,

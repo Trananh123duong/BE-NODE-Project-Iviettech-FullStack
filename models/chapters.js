@@ -16,7 +16,7 @@ module.exports = function(sequelize, DataTypes) {
       }
     },
     chapter_number: {
-      type: DataTypes.DECIMAL(10,2),
+      type: DataTypes.INTEGER,
       allowNull: false
     },
     title: {

@@ -4,7 +4,8 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon app.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "crawl:once": "node utils/test-crawl.js"
   },
   "keywords": [],
   "author": "",
@@ -21,7 +22,8 @@
     "multer": "^2.0.2",
     "mysql2": "^3.14.2",
     "sequelize": "^6.37.7",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "axios": "^1.7.3"
   },
   "devDependencies": {
     "jest": "^30.0.5",

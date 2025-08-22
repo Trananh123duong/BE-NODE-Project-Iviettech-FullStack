@@ -8,7 +8,11 @@ const sequelize = new Sequelize(
   process.env.DB_PASSWORD,
   {
     host: process.env.DB_HOST,
-    dialect: 'mysql' // Khai báo RDB CSDL đang dùng là MySQL
+    dialect: 'mysql', // Khai báo RDB CSDL đang dùng là MySQL
+    define: {
+      timestamps: true,
+      underscored: true,
+    },
   }
 );
 

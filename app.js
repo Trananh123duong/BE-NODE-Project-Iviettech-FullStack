@@ -1,16 +1,24 @@
-const express = require('express')
-const path = require('path')
-const morgan = require('morgan')
-const cors = require('cors')
-const { v4: uuidv4 } = require('uuid')
+require('dotenv').config();
+
+const express = require('express');
+const morgan = require('morgan');
+const cors = require('cors');
+const path = require('path');
+
+const errorHandler = require('./middleware/errorHandler');
 
 const app = express()
+const port = process.env.PORT;
 
-app.use(express.static('public'))
-app.use(express.json())
-app.use(morgan('dev'))
-app.use(cors())
+app.use(morgan('dev'));
+app.use(cors());
+app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-app.listen(3000, () => {
-  console.log('Đã chạy ok')
+//routes
+
+app.use(errorHandler);
+
+app.listen(port, () => {
+  console.log(`Server đang chạy tại http://localhost:${port}`)
 })

@@ -5,7 +5,8 @@ const morgan = require('morgan');
 const cors = require('cors');
 const path = require('path');
 
-const crawlRouter = require('./routes/crawl');
+const crawlRouters = require('./routes/crawl');
+const userCategoryRoutes = require('./routes/user/category.route')
 
 const errorHandler = require('./middleware/errorHandler');
 
@@ -18,7 +19,8 @@ app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 //routes
-app.use('/crawl', crawlRouter);
+app.use('/crawl', crawlRouters);
+app.use('/api/categories', userCategoryRoutes);
 
 app.use(errorHandler);
 

@@ -5,6 +5,7 @@ var _chapters = require("./chapters");
 var _stories = require("./stories");
 var _story_categories = require("./story_categories");
 var _story_views = require("./story_views");
+var _users = require("./users");
 
 function initModels(sequelize) {
   var categories = _categories(sequelize, DataTypes);
@@ -13,6 +14,7 @@ function initModels(sequelize) {
   var stories = _stories(sequelize, DataTypes);
   var story_categories = _story_categories(sequelize, DataTypes);
   var story_views = _story_views(sequelize, DataTypes);
+  var users = _users(sequelize, DataTypes);
 
   categories.belongsToMany(stories, { as: 'story_id_stories', through: story_categories, foreignKey: "category_id", otherKey: "story_id" });
   stories.belongsToMany(categories, { as: 'category_id_categories', through: story_categories, foreignKey: "story_id", otherKey: "category_id" });
@@ -34,6 +36,7 @@ function initModels(sequelize) {
     stories,
     story_categories,
     story_views,
+    users,
   };
 }
 module.exports = initModels;

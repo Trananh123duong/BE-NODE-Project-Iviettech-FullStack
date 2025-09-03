@@ -1,4 +1,5 @@
 require('dotenv').config();
+require('./jobs/cleanupStoryViews')
 
 const express = require('express');
 const morgan = require('morgan');

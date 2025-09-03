@@ -1,6 +1,7 @@
 // controllers/story.controller.js
 const { Op } = require('sequelize')
 const asyncHandler = require('express-async-handler')
+const { NotFoundError } = require('../../utils/ApiError')
 
 const { stories: Story, categories: Category, chapters: Chapter } = require('../../models')
 
@@ -67,7 +68,7 @@ const getStoryList = asyncHandler(async (req, res) => {
 
   const totalPages = Math.ceil(result.count / parseInt(limit, 10))
 
-  res.json({
+  res.status(200).json({
     data: result.rows,
     meta: {
       total: result.count,
@@ -78,6 +79,29 @@ const getStoryList = asyncHandler(async (req, res) => {
   })
 })
 
+const getStoryDetail = asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const story = await Story.findByPk(id, {
+    include: [
+      {
+        model: Category,
+        as: 'category_id_categories',
+        attributes: ['id', 'name'],
+        through: { attributes: [] },
+        required: false,
+      },
+    ],
+  })
+
+  if (!story) {
+    throw new NotFoundError('Không tìm thấy truyện')
+  }
+
+  res.status(200).json(story)
+})
+
 module.exports = {
-  getStoryList
+  getStoryList,
+  getStoryDetail
 }

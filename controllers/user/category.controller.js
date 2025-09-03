@@ -16,10 +16,7 @@ const getAllCategories = asyncHandler(async (req, res) => {
     throw new NotFoundError('Không tìm thấy thể loại nào')
   }
 
-  res.status(200).json({
-    success: true,
-    data: categories,
-  })
+  res.status(200).json(categories)
 })
 
 module.exports = {

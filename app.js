@@ -8,6 +8,7 @@ const path = require('path');
 const crawlRouters = require('./routes/crawl');
 const userPageCategoryRoutes = require('./routes/user/category.route')
 const userPageStoryRoutes = require('./routes/user/story.route')
+const userPageSChapterRoutes = require('./routes/user/chapter.route')
 
 const errorHandler = require('./middleware/errorHandler');
 
@@ -23,6 +24,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/crawl', crawlRouters);
 app.use('/api/categories', userPageCategoryRoutes);
 app.use('/api/stories', userPageStoryRoutes);
+app.use('/api/chapters', userPageSChapterRoutes);
 
 app.use(errorHandler);
 

@@ -1,11 +1,11 @@
 -- phpMyAdmin SQL Dump
--- version 5.2.2
+-- version 5.2.1
 -- https://www.phpmyadmin.net/
 --
 -- Máy chủ: mysql:3306
--- Thời gian đã tạo: Th8 23, 2025 lúc 12:49 PM
--- Phiên bản máy phục vụ: 8.0.41
--- Phiên bản PHP: 8.2.27
+-- Thời gian đã tạo: Th9 03, 2025 lúc 07:18 AM
+-- Phiên bản máy phục vụ: 8.0.40
+-- Phiên bản PHP: 8.2.8
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -94,6 +94,20 @@ CREATE TABLE `story_categories` (
   `category_id` bigint UNSIGNED NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `story_views`
+--
+
+CREATE TABLE `story_views` (
+  `id` bigint UNSIGNED NOT NULL,
+  `story_id` bigint UNSIGNED NOT NULL,
+  `user_id` bigint UNSIGNED DEFAULT NULL,
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 --
 -- Chỉ mục cho các bảng đã đổ
 --
@@ -138,6 +152,15 @@ ALTER TABLE `story_categories`
   ADD KEY `idx_sc_category` (`category_id`);
 
 --
+-- Chỉ mục cho bảng `story_views`
+--
+ALTER TABLE `story_views`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_sv_story_time` (`story_id`,`created_at`),
+  ADD KEY `idx_sv_time` (`created_at`),
+  ADD KEY `idx_sv_user_story_time` (`user_id`,`story_id`,`created_at`);
+
+--
 -- AUTO_INCREMENT cho các bảng đã đổ
 --
 
@@ -166,27 +189,39 @@ ALTER TABLE `stories`
   MODIFY `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
--- Ràng buộc đối với các bảng kết xuất
+-- AUTO_INCREMENT cho bảng `story_views`
+--
+ALTER TABLE `story_views`
+  MODIFY `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- Các ràng buộc cho các bảng đã đổ
 --
 
 --
--- Ràng buộc cho bảng `chapters`
+-- Các ràng buộc cho bảng `chapters`
 --
 ALTER TABLE `chapters`
   ADD CONSTRAINT `fk_chapters_story` FOREIGN KEY (`story_id`) REFERENCES `stories` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Ràng buộc cho bảng `chapter_images`
+-- Các ràng buộc cho bảng `chapter_images`
 --
 ALTER TABLE `chapter_images`
   ADD CONSTRAINT `fk_cimg_chapter` FOREIGN KEY (`chapter_id`) REFERENCES `chapters` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Ràng buộc cho bảng `story_categories`
+-- Các ràng buộc cho bảng `story_categories`
 --
 ALTER TABLE `story_categories`
   ADD CONSTRAINT `fk_sc_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_sc_story` FOREIGN KEY (`story_id`) REFERENCES `stories` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Các ràng buộc cho bảng `story_views`
+--
+ALTER TABLE `story_views`
+  ADD CONSTRAINT `fk_sv_story` FOREIGN KEY (`story_id`) REFERENCES `stories` (`id`);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

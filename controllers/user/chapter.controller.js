@@ -1,6 +1,11 @@
 const asyncHandler = require('express-async-handler')
 const { NotFoundError } = require('../../utils/ApiError')
-const { chapters: Chapter, stories: Story, chapter_images: ChapterImage } = require('../../models')
+const {
+  chapters: Chapter,
+  stories: Story,
+  chapter_images: ChapterImage,
+  story_views: StoryView
+} = require('../../models')
 
 const getChaptersByStory = asyncHandler(async (req, res) => {
   const { storyId } = req.params
@@ -22,6 +27,7 @@ const getChaptersByStory = asyncHandler(async (req, res) => {
 
 const getChapterDetail = asyncHandler(async (req, res) => {
   const { id } = req.params
+  const userId = req.user?.id || null
 
   const chapter = await Chapter.findByPk(id, {
     attributes: ['id', 'story_id', 'chapter_number', 'title'],
@@ -40,6 +46,16 @@ const getChapterDetail = asyncHandler(async (req, res) => {
   if (!chapter) {
     throw new NotFoundError('Không tìm thấy chapter')
   }
+
+  await StoryView.create({
+    story_id: chapter.story_id,
+    user_id: userId,
+  })
+
+  await Story.increment('total_view', {
+    by: 1,
+    where: { id: chapter.story_id },
+  })
 
   return res.status(200).json(chapter)
 })

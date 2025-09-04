@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Máy chủ: mysql:3306
--- Thời gian đã tạo: Th9 03, 2025 lúc 09:14 AM
+-- Thời gian đã tạo: Th9 04, 2025 lúc 09:26 AM
 -- Phiên bản máy phục vụ: 8.0.40
 -- Phiên bản PHP: 8.2.8
 
@@ -103,7 +103,6 @@ CREATE TABLE `story_categories` (
 CREATE TABLE `story_views` (
   `id` bigint UNSIGNED NOT NULL,
   `story_id` bigint UNSIGNED NOT NULL,
-  `user_id` bigint UNSIGNED DEFAULT NULL,
   `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -176,7 +175,7 @@ ALTER TABLE `story_views`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_sv_story_time` (`story_id`,`created_at`),
   ADD KEY `idx_sv_time` (`created_at`),
-  ADD KEY `idx_sv_user_story_time` (`user_id`,`story_id`,`created_at`);
+  ADD KEY `idx_sv_user_story_time` (`story_id`,`created_at`);
 
 --
 -- Chỉ mục cho bảng `users`

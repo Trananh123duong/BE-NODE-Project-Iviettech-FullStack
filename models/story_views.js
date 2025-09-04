@@ -14,10 +14,6 @@ module.exports = function(sequelize, DataTypes) {
         model: 'stories',
         key: 'id'
       }
-    },
-    user_id: {
-      type: DataTypes.BIGINT.UNSIGNED,
-      allowNull: true
     }
   }, {
     sequelize,
@@ -51,7 +47,6 @@ module.exports = function(sequelize, DataTypes) {
         name: "idx_sv_user_story_time",
         using: "BTREE",
         fields: [
-          { name: "user_id" },
           { name: "story_id" },
           { name: "created_at" },
         ]

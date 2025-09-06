@@ -1,6 +1,12 @@
 const Sequelize = require('sequelize');
 module.exports = function(sequelize, DataTypes) {
   return sequelize.define('reading_history', {
+    id: {
+      autoIncrement: true,
+      type: DataTypes.BIGINT.UNSIGNED,
+      allowNull: false,
+      primaryKey: true
+    },
     user_id: {
       type: DataTypes.BIGINT.UNSIGNED,
       allowNull: false,
@@ -34,6 +40,14 @@ module.exports = function(sequelize, DataTypes) {
     tableName: 'reading_history',
     timestamps: false,
     indexes: [
+      {
+        name: "PRIMARY",
+        unique: true,
+        using: "BTREE",
+        fields: [
+          { name: "id" },
+        ]
+      },
       {
         name: "uk_user_story",
         unique: true,

@@ -10,7 +10,8 @@ const authRoutes = require('./routes/auth.route')
 const crawlRouters = require('./routes/crawl');
 const userPageCategoryRoutes = require('./routes/user/category.route')
 const userPageStoryRoutes = require('./routes/user/story.route')
-const userPageSChapterRoutes = require('./routes/user/chapter.route')
+const userPageChapterRoutes = require('./routes/user/chapter.route')
+const userPageHistoryRoutes = require('./routes/user/history.route')
 
 const errorHandler = require('./middleware/errorHandler');
 
@@ -27,7 +28,8 @@ app.use('/api/auth', authRoutes);
 app.use('/crawl', crawlRouters);
 app.use('/api/categories', userPageCategoryRoutes);
 app.use('/api/stories', userPageStoryRoutes);
-app.use('/api/chapters', userPageSChapterRoutes);
+app.use('/api/chapters', userPageChapterRoutes);
+app.use('/api/me/history', userPageHistoryRoutes);
 
 app.use(errorHandler);
 

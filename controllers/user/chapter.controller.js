@@ -4,25 +4,38 @@ const {
   chapters: Chapter,
   stories: Story,
   chapter_images: ChapterImage,
-  story_views: StoryView
+  story_views: StoryView,
+  reading_history: ReadingHistory,
 } = require('../../models')
 
 const getChaptersByStory = asyncHandler(async (req, res) => {
   const { storyId } = req.params
+  const userId = req.user?.id || null
 
   const story = await Story.findByPk(storyId)
   if (!story) throw new NotFoundError('Không tìm thấy truyện')
 
   const chapters = await Chapter.findAll({
     where: { story_id: storyId },
-    attributes: ['id', 'chapter_number', 'title', 'updatedAt'],
+    attributes: ['id', 'chapter_number', 'title', 'updated_at'],
     order: [
       ['chapter_number', 'DESC'],
       ['id', 'DESC'],
     ],
   })
 
-  return res.status(200).json(chapters)
+  let history = null
+  if (userId) {
+    history = await ReadingHistory.findOne({
+      where: { user_id: userId, story_id: storyId },
+      attributes: ['chapter_id', 'last_read_at'],
+    })
+  }
+
+  return res.status(200).json({
+    chapters,
+    history,
+  })
 })
 
 const getChapterDetail = asyncHandler(async (req, res) => {
@@ -56,6 +69,15 @@ const getChapterDetail = asyncHandler(async (req, res) => {
     by: 1,
     where: { id: chapter.story_id },
   })
+
+  if (userId) {
+    await ReadingHistory.upsert({
+      user_id: userId,
+      story_id: chapter.story_id,
+      chapter_id: chapter.id,
+      last_read_at: new Date(),
+    })
+  }
 
   return res.status(200).json(chapter)
 })

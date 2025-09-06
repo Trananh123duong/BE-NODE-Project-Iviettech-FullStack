@@ -3,7 +3,11 @@ const { Op } = require('sequelize')
 const asyncHandler = require('express-async-handler')
 const { NotFoundError } = require('../../utils/ApiError')
 
-const { stories: Story, categories: Category, chapters: Chapter } = require('../../models')
+const {
+  stories: Story,
+  categories: Category,
+  chapters: Chapter
+} = require('../../models')
 
 const getStoryList = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10, sort = 'id', order = 'desc', keyword } = req.query
@@ -52,17 +56,43 @@ const getStoryList = asyncHandler(async (req, res) => {
   }
 
   const sortOrder = String(order).toLowerCase() === 'desc' ? 'DESC' : 'ASC'
-  const sortColumn = ['id', 'name', 'total_view', 'total_follow', 'created_at', 'updated_at'].includes(sort)
-    ? sort
-    : 'id'
+  const sortWhitelist = ['id', 'name', 'total_view', 'total_follow', 'created_at', 'updated_at']
+  const isViewSort = sort === 'view_day' || sort === 'view_week' || sort === 'view_month' || sort === 'view_all'
+
+  let orderClause
+  if (!isViewSort) {
+    const sortColumn = sortWhitelist.includes(String(sort)) ? String(sort) : 'id'
+    orderClause = [[sortColumn, sortOrder]]
+  } else if (sort === 'view_all') {
+    // dùng counter tổng có sẵn
+    orderClause = [
+      [Story.sequelize.literal('total_view'), sortOrder],
+      ['updated_at', 'DESC'],
+      ['id', 'DESC']
+    ]
+  } else {
+    const start = getStartAt(sort)
+    const startStr = new Date(start).toISOString().slice(0, 19).replace('T', ' ')
+    const escStart = Story.sequelize.escape(startStr)
+
+    const expr = `(SELECT COUNT(*) FROM story_views sv
+                  WHERE sv.story_id = stories.id
+                    AND sv.created_at >= ${escStart})`
+    
+    orderClause = [
+      [Story.sequelize.literal(expr), sortOrder],
+      ['updated_at', 'DESC'],
+      ['id', 'DESC']
+    ]
+  }
 
   const result = await Story.findAndCountAll({
     where: whereClause,
     include: [categoryInclude, chapterInclude],
-    order: [[sortColumn, sortOrder]],
+    order: orderClause,
     limit: parseInt(limit, 10),
     offset: parseInt(offset, 10),
-    distinct: true, // cần khi JOIN n-n để count đúng
+    distinct: true,
     subQuery: false,
   })
 
@@ -78,6 +108,28 @@ const getStoryList = asyncHandler(async (req, res) => {
     },
   })
 })
+
+function getStartAt(key) {
+  const now = new Date()
+  if (key === 'view_day') {
+    const d = new Date(now);
+    d.setHours(0, 0, 0, 0);
+    return d
+  }
+  if (key === 'view_week') {
+    const d = new Date(now)
+    const day = (d.getDay() + 6) % 7 // Monday=0
+    d.setDate(d.getDate() - day);
+    d.setHours(0, 0, 0, 0);
+    return d
+  }
+  if (key === 'view_month') {
+    const d = new Date(now.getFullYear(), now.getMonth(), 1)
+    d.setHours(0, 0, 0, 0);
+    return d
+  }
+  return null
+}
 
 const getStoryDetail = asyncHandler(async (req, res) => {
   const { id } = req.params

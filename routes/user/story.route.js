@@ -3,12 +3,16 @@ const router = express.Router()
 
 const storyController = require('../../controllers/user/story.controller')
 const chapterController = require('../../controllers/user/chapter.controller')
-const { optionalAuth  } = require('../../middleware/auth')
+const followCtrl = require('../../controllers/user/follow.controller')
 
-// Category
+const { optionalAuth, verifyToken } = require('../../middleware/auth')
+
 router.get('/', storyController.getStoryList)
-router.get('/:id', storyController.getStoryDetail)
+router.get('/:id', optionalAuth, storyController.getStoryDetail)
 
 router.get('/:storyId/chapters', optionalAuth, chapterController.getChaptersByStory)
+
+router.post('/:storyId/follow', verifyToken, followCtrl.followStory)
+router.delete('/:storyId/follow', verifyToken, followCtrl.unfollowStory)
 
 module.exports = router

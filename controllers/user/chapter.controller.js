@@ -82,7 +82,6 @@ const getChapterDetail = asyncHandler(async (req, res) => {
   return res.status(200).json(chapter)
 })
 
-
 module.exports = {
   getChaptersByStory,
   getChapterDetail

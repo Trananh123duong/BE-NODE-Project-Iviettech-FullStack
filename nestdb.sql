@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Máy chủ: mysql:3306
--- Thời gian đã tạo: Th9 06, 2025 lúc 12:12 PM
+-- Thời gian đã tạo: Th9 07, 2025 lúc 09:45 AM
 -- Phiên bản máy phục vụ: 8.0.41
 -- Phiên bản PHP: 8.2.27
 
@@ -71,6 +71,7 @@ CREATE TABLE `chapter_images` (
 --
 
 CREATE TABLE `reading_history` (
+  `id` bigint UNSIGNED NOT NULL,
   `user_id` bigint UNSIGNED NOT NULL,
   `story_id` bigint UNSIGNED NOT NULL,
   `chapter_id` bigint UNSIGNED DEFAULT NULL,
@@ -146,7 +147,9 @@ CREATE TABLE `users` (
 
 CREATE TABLE `user_follows` (
   `user_id` bigint UNSIGNED NOT NULL,
-  `story_id` bigint UNSIGNED NOT NULL
+  `story_id` bigint UNSIGNED NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
@@ -180,6 +183,7 @@ ALTER TABLE `chapter_images`
 -- Chỉ mục cho bảng `reading_history`
 --
 ALTER TABLE `reading_history`
+  ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `uk_user_story` (`user_id`,`story_id`),
   ADD KEY `idx_rh_user_time` (`user_id`,`last_read_at`),
   ADD KEY `idx_rh_story` (`story_id`),
@@ -246,6 +250,12 @@ ALTER TABLE `chapters`
 -- AUTO_INCREMENT cho bảng `chapter_images`
 --
 ALTER TABLE `chapter_images`
+  MODIFY `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT cho bảng `reading_history`
+--
+ALTER TABLE `reading_history`
   MODIFY `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --

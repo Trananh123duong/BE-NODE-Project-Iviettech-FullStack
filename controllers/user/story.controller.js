@@ -6,7 +6,8 @@ const { NotFoundError } = require('../../utils/ApiError')
 const {
   stories: Story,
   categories: Category,
-  chapters: Chapter
+  chapters: Chapter,
+  user_follows: UserFollow,
 } = require('../../models')
 
 const getStoryList = asyncHandler(async (req, res) => {
@@ -133,6 +134,7 @@ function getStartAt(key) {
 
 const getStoryDetail = asyncHandler(async (req, res) => {
   const { id } = req.params
+  const userId = req.user?.id || null
 
   const story = await Story.findByPk(id, {
     include: [
@@ -150,7 +152,20 @@ const getStoryDetail = asyncHandler(async (req, res) => {
     throw new NotFoundError('Không tìm thấy truyện')
   }
 
-  res.status(200).json(story)
+  let is_followed = false
+  if (userId) {
+    const ex = await UserFollow.findOne({
+      where: { user_id: userId, story_id: id },
+      attributes: ['user_id'],
+      raw: true,
+    })
+    is_followed = !!ex
+  }
+
+  const payload = story.toJSON()
+  payload.is_followed = is_followed
+
+  res.status(200).json(payload)
 })
 
 module.exports = {

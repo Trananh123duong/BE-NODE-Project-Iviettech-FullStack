@@ -94,7 +94,7 @@ const getStoryList = asyncHandler(async (req, res) => {
     limit: parseInt(limit, 10),
     offset: parseInt(offset, 10),
     distinct: true,
-    subQuery: false,
+    // subQuery: false,
   })
 
   const totalPages = Math.ceil(result.count / parseInt(limit, 10))

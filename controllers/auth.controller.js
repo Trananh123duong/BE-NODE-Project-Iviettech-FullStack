@@ -8,6 +8,11 @@ const { UnauthorizedError, ForbiddenError } = require('../utils/ApiError')
 const register = asyncHandler(async (req, res) => {
   const { username, email, password } = req.body;
 
+  const existingUser = await User.findOne({ where: { email } })
+  if (existingUser) {
+    throw new BadRequestError('Email đã được sử dụng')
+  }
+
   const salt = await bcrypt.genSalt(10)
   const hashedPassword = await bcrypt.hash(password, salt)
 

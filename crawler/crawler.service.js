@@ -67,20 +67,29 @@ async function crawlChapterImages(chapterApiUrl, chapterId) {
   const chapterPath = String(data.item.chapter_path || '').replace(/^\/|\/$/g, '');
   const list = data.item.chapter_image || [];
 
-  for (const img of list) {
+  // Lấy sort_order bắt đầu (append tiếp)
+  const lastSort = await models.chapter_images.max('sort_order', {
+    where: { chapter_id: chapterId },
+  });
+  let base = Number.isFinite(lastSort) ? Number(lastSort) + 1 : 0;
+
+  for (let i = 0; i < list.length; i++) {
+    const img = list[i];
     const fullUrl = `${domain}/${chapterPath}/${img.image_file}`;
 
-    // chống trùng tay
     const exists = await models.chapter_images.findOne({
       where: { chapter_id: chapterId, img_path: fullUrl },
-      attributes: ['id']
+      attributes: ['id'],
     });
+
     if (!exists) {
       await models.chapter_images.create({
         chapter_id: chapterId,
         img_path: fullUrl,
-        img_type: 'EXTERNAL'
+        img_type: 'EXTERNAL',
+        sort_order: base,
       });
+      base += 1;
     }
   }
 }

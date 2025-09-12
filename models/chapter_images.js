@@ -23,6 +23,11 @@ module.exports = function(sequelize, DataTypes) {
       type: DataTypes.ENUM('EXTERNAL','INTERNAL'),
       allowNull: false,
       defaultValue: "EXTERNAL"
+    },
+    sort_order: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      defaultValue: 0
     }
   }, {
     sequelize,

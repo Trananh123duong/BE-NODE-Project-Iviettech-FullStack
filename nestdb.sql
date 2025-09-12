@@ -1,11 +1,11 @@
 -- phpMyAdmin SQL Dump
--- version 5.2.2
+-- version 5.2.1
 -- https://www.phpmyadmin.net/
 --
 -- Máy chủ: mysql:3306
--- Thời gian đã tạo: Th9 07, 2025 lúc 09:45 AM
--- Phiên bản máy phục vụ: 8.0.41
--- Phiên bản PHP: 8.2.27
+-- Thời gian đã tạo: Th9 12, 2025 lúc 03:46 AM
+-- Phiên bản máy phục vụ: 8.0.40
+-- Phiên bản PHP: 8.2.8
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -60,6 +60,7 @@ CREATE TABLE `chapter_images` (
   `chapter_id` bigint UNSIGNED NOT NULL,
   `img_path` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `img_type` enum('EXTERNAL','INTERNAL') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'EXTERNAL',
+  `sort_order` int UNSIGNED NOT NULL DEFAULT '0',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -129,12 +130,12 @@ CREATE TABLE `story_views` (
 
 CREATE TABLE `users` (
   `id` bigint UNSIGNED NOT NULL,
-  `username` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `email` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `password` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `avatar` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `role` enum('user','admin') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'user',
-  `refresh_token` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `username` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `email` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `password` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `avatar` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `role` enum('user','admin') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'user',
+  `refresh_token` text COLLATE utf8mb4_unicode_ci,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -277,23 +278,23 @@ ALTER TABLE `users`
   MODIFY `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
--- Ràng buộc đối với các bảng kết xuất
+-- Các ràng buộc cho các bảng đã đổ
 --
 
 --
--- Ràng buộc cho bảng `chapters`
+-- Các ràng buộc cho bảng `chapters`
 --
 ALTER TABLE `chapters`
   ADD CONSTRAINT `fk_chapters_story` FOREIGN KEY (`story_id`) REFERENCES `stories` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Ràng buộc cho bảng `chapter_images`
+-- Các ràng buộc cho bảng `chapter_images`
 --
 ALTER TABLE `chapter_images`
   ADD CONSTRAINT `fk_cimg_chapter` FOREIGN KEY (`chapter_id`) REFERENCES `chapters` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Ràng buộc cho bảng `reading_history`
+-- Các ràng buộc cho bảng `reading_history`
 --
 ALTER TABLE `reading_history`
   ADD CONSTRAINT `fk_rh_chapter` FOREIGN KEY (`chapter_id`) REFERENCES `chapters` (`id`) ON DELETE SET NULL,
@@ -301,20 +302,20 @@ ALTER TABLE `reading_history`
   ADD CONSTRAINT `fk_rh_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
 --
--- Ràng buộc cho bảng `story_categories`
+-- Các ràng buộc cho bảng `story_categories`
 --
 ALTER TABLE `story_categories`
   ADD CONSTRAINT `fk_sc_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_sc_story` FOREIGN KEY (`story_id`) REFERENCES `stories` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Ràng buộc cho bảng `story_views`
+-- Các ràng buộc cho bảng `story_views`
 --
 ALTER TABLE `story_views`
   ADD CONSTRAINT `fk_sv_story` FOREIGN KEY (`story_id`) REFERENCES `stories` (`id`);
 
 --
--- Ràng buộc cho bảng `user_follows`
+-- Các ràng buộc cho bảng `user_follows`
 --
 ALTER TABLE `user_follows`
   ADD CONSTRAINT `fk_uf_story` FOREIGN KEY (`story_id`) REFERENCES `stories` (`id`) ON DELETE CASCADE,

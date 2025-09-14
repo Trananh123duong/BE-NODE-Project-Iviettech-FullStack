@@ -11,7 +11,14 @@ const {
 } = require('../../models')
 
 const getStoryList = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, sort = 'id', order = 'desc', keyword } = req.query
+  const {
+    page = 1,
+    limit = 10,
+    sort = 'id',
+    order = 'desc',
+    keyword,
+    status
+  } = req.query
   const categoryIds = req.query['categoryIds[]']
   const offset = (page - 1) * limit
 
@@ -20,6 +27,12 @@ const getStoryList = asyncHandler(async (req, res) => {
     whereClause.name = { [Op.like]: `%${keyword}%` }
     // có thể mở rộng:
     // whereClause = { [Op.or]: [{ name: { [Op.like]: `%${keyword}%` } }, { author: { [Op.like]: `%${keyword}%` } }] }
+  }
+
+  // lọc theo status (FE không gửi khi = 'all')
+  const ALLOWED_STATUS = ['coming_soon', 'ongoing', 'completed']
+  if (status && ALLOWED_STATUS.includes(status)) {
+    whereClause.status = status
   }
 
   // include mặc định (không lọc theo category)

@@ -1,9 +1,12 @@
+const fs = require('fs')
+const path = require('path')
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
-const { users: User } = require('../models');
+const { Op } = require('sequelize')
+const { users: User } = require('../models')
 const asyncHandler = require('express-async-handler')
+const { UnauthorizedError, ForbiddenError, BadRequestError } = require('../utils/ApiError')
 
-const { UnauthorizedError, ForbiddenError } = require('../utils/ApiError')
 
 const register = asyncHandler(async (req, res) => {
   const { username, email, password } = req.body;
@@ -91,9 +94,90 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   });
 });
 
+const updateProfile = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { username } = req.body || {};
+
+  if (typeof username !== 'string' || !username.trim()) {
+    throw new BadRequestError('Username không hợp lệ');
+  }
+
+  const nextUsername = username.trim();
+  if (nextUsername.length > 50) {
+    throw new BadRequestError('Username tối đa 50 ký tự');
+  }
+
+  const user = await User.findByPk(userId);
+  if (!user) throw new UnauthorizedError('Không tìm thấy người dùng');
+
+  if (nextUsername === user.username) {
+    return res.status(200).json({
+      message: 'Username không thay đổi',
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      }
+    });
+  }
+
+  // kiểm tra trùng username (loại trừ chính mình)
+  const isTaken = await User.count({
+    where: { username: nextUsername, id: { [Op.ne]: userId } }
+  });
+  if (isTaken) throw new BadRequestError('Username đã được sử dụng');
+
+  await user.update({ username: nextUsername });
+
+  // trả về user an toàn
+  const { password, refresh_token, ...safeUser } = user.toJSON();
+  res.status(200).json({
+    message: 'Cập nhật username thành công',
+    user: safeUser
+  });
+});
+
+const uploadAvatar = asyncHandler(async (req, res) => {
+  const userId = req.user?.id
+  if (!userId) throw new UnauthorizedError('Chưa đăng nhập')
+  if (!req.file) throw new BadRequestError('Không có file được tải lên')
+
+  const user = await User.findByPk(userId)
+  if (!user) throw new UnauthorizedError('Không tìm thấy người dùng')
+
+  // Xoá file avatar cũ (nếu là file local trong /uploads/avatar)
+  try {
+    const old = user.avatar
+    if (old && /^\/?uploads\/avatar\//.test(old)) {
+      const oldPath = path.join(process.cwd(), old.replace(/^\//, ''))
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath)
+    }
+  } catch (e) {
+    // không chặn flow nếu xoá thất bại
+    console.error('Remove old avatar failed:', e?.message || e)
+  }
+
+  // Lưu đường dẫn mới (dùng prefix / để khớp util toAbsolute trên FE)
+  const storedPath = `/uploads/avatar/${req.file.filename}`
+  await user.update({ avatar: storedPath })
+
+  // trả về user safe
+  const { password, refresh_token, ...safeUser } = user.toJSON()
+  res.status(200).json({
+    message: 'Tải lên avatar thành công',
+    user: safeUser,
+  })
+})
+
 module.exports = {
   register,
   login,
   getMyProfile,
-  refreshAccessToken
+  refreshAccessToken,
+  updateProfile,
+  uploadAvatar
 };

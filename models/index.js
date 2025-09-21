@@ -26,4 +26,15 @@ if (models.stories) {
   }
 }
 
+if (models.users) {
+  const origToJSONUser = models.users.prototype.toJSON
+  models.users.prototype.toJSON = function () {
+    const values = typeof origToJSONUser === 'function'
+      ? origToJSONUser.call(this)
+      : this.get({ plain: true })
+    values.avatar = toAbsoluteUrl(values.avatar)
+    return values
+  }
+}
+
 module.exports = models

@@ -3,9 +3,9 @@ const path = require('path')
 
 const { BadRequestError } = require('../utils/ApiError')
 
-const storage = multer.diskStorage({
+const avatarStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/')
+    cb(null, 'uploads/avatar')
   },
   filename: (req, file, cb) => {
     const suffix = Date.now() + '-' + Math.round(Math.random() * 1e9)
@@ -13,8 +13,8 @@ const storage = multer.diskStorage({
   },
 })
 
-const upload = multer({
-  storage: storage,
+const avatarUploads = multer({
+  storage: avatarStorage,
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB
   },
@@ -33,5 +33,5 @@ const upload = multer({
 })
 
 module.exports = {
-  upload,
+  avatarUploads,
 }

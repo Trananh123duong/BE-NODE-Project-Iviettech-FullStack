@@ -1,36 +1,31 @@
 const Sequelize = require('sequelize');
 module.exports = function(sequelize, DataTypes) {
-  return sequelize.define('chapters', {
-    id: {
-      autoIncrement: true,
-      type: DataTypes.BIGINT.UNSIGNED,
-      allowNull: false,
-      primaryKey: true
-    },
+  return sequelize.define('story_ratings', {
     story_id: {
       type: DataTypes.BIGINT.UNSIGNED,
       allowNull: false,
+      primaryKey: true,
       references: {
         model: 'stories',
         key: 'id'
       }
     },
-    chapter_number: {
-      type: DataTypes.INTEGER,
-      allowNull: false
-    },
-    title: {
-      type: DataTypes.STRING(255),
-      allowNull: true
-    },
-    comments_count: {
-      type: DataTypes.INTEGER.UNSIGNED,
+    user_id: {
+      type: DataTypes.BIGINT.UNSIGNED,
       allowNull: false,
-      defaultValue: 0
+      primaryKey: true,
+      references: {
+        model: 'users',
+        key: 'id'
+      }
+    },
+    rating: {
+      type: DataTypes.TINYINT.UNSIGNED,
+      allowNull: false
     }
   }, {
     sequelize,
-    tableName: 'chapters',
+    tableName: 'story_ratings',
     timestamps: true,
     indexes: [
       {
@@ -38,23 +33,23 @@ module.exports = function(sequelize, DataTypes) {
         unique: true,
         using: "BTREE",
         fields: [
-          { name: "id" },
+          { name: "story_id" },
+          { name: "user_id" },
         ]
       },
       {
-        name: "uk_chapters_story_no",
-        unique: true,
+        name: "idx_sr_user",
         using: "BTREE",
         fields: [
-          { name: "story_id" },
-          { name: "chapter_number" },
+          { name: "user_id" },
         ]
       },
       {
-        name: "idx_chapters_story",
+        name: "idx_sr_story_rating",
         using: "BTREE",
         fields: [
           { name: "story_id" },
+          { name: "rating" },
         ]
       },
     ]

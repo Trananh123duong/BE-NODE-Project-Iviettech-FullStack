@@ -36,6 +36,21 @@ module.exports = function(sequelize, DataTypes) {
     thumbnail: {
       type: DataTypes.STRING(512),
       allowNull: true
+    },
+    avg_rating: {
+      type: DataTypes.DECIMAL(3,2),
+      allowNull: false,
+      defaultValue: 0.00
+    },
+    ratings_count: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      defaultValue: 0
+    },
+    comments_count: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: false,
+      defaultValue: 0
     }
   }, {
     sequelize,

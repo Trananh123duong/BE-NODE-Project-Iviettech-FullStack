@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Máy chủ: mysql:3306
--- Thời gian đã tạo: Th9 12, 2025 lúc 03:46 AM
+-- Thời gian đã tạo: Th9 23, 2025 lúc 08:33 AM
 -- Phiên bản máy phục vụ: 8.0.40
 -- Phiên bản PHP: 8.2.8
 
@@ -46,7 +46,8 @@ CREATE TABLE `chapters` (
   `chapter_number` int NOT NULL,
   `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `comments_count` int UNSIGNED NOT NULL DEFAULT '0'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -61,6 +62,19 @@ CREATE TABLE `chapter_images` (
   `img_path` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `img_type` enum('EXTERNAL','INTERNAL') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'EXTERNAL',
   `sort_order` int UNSIGNED NOT NULL DEFAULT '0',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `comment_likes`
+--
+
+CREATE TABLE `comment_likes` (
+  `comment_id` bigint UNSIGNED NOT NULL,
+  `user_id` bigint UNSIGNED NOT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -95,7 +109,10 @@ CREATE TABLE `stories` (
   `description` mediumtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `thumbnail` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `avg_rating` decimal(3,2) NOT NULL DEFAULT '0.00',
+  `ratings_count` int UNSIGNED NOT NULL DEFAULT '0',
+  `comments_count` int UNSIGNED NOT NULL DEFAULT '0'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -107,6 +124,39 @@ CREATE TABLE `stories` (
 CREATE TABLE `story_categories` (
   `story_id` bigint UNSIGNED NOT NULL,
   `category_id` bigint UNSIGNED NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `story_comments`
+--
+
+CREATE TABLE `story_comments` (
+  `id` bigint UNSIGNED NOT NULL,
+  `story_id` bigint UNSIGNED NOT NULL,
+  `chapter_id` bigint UNSIGNED DEFAULT NULL,
+  `user_id` bigint UNSIGNED NOT NULL,
+  `parent_id` bigint UNSIGNED DEFAULT NULL,
+  `body` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `is_spoiler` tinyint(1) NOT NULL DEFAULT '0',
+  `deleted_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `story_ratings`
+--
+
+CREATE TABLE `story_ratings` (
+  `story_id` bigint UNSIGNED NOT NULL,
+  `user_id` bigint UNSIGNED NOT NULL,
+  `rating` tinyint UNSIGNED NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -181,6 +231,13 @@ ALTER TABLE `chapter_images`
   ADD KEY `idx_cimg_sort` (`chapter_id`);
 
 --
+-- Chỉ mục cho bảng `comment_likes`
+--
+ALTER TABLE `comment_likes`
+  ADD PRIMARY KEY (`comment_id`,`user_id`),
+  ADD KEY `idx_cl_user` (`user_id`);
+
+--
 -- Chỉ mục cho bảng `reading_history`
 --
 ALTER TABLE `reading_history`
@@ -205,6 +262,24 @@ ALTER TABLE `stories` ADD FULLTEXT KEY `ftx_stories_name_desc` (`name`,`descript
 ALTER TABLE `story_categories`
   ADD PRIMARY KEY (`story_id`,`category_id`),
   ADD KEY `idx_sc_category` (`category_id`);
+
+--
+-- Chỉ mục cho bảng `story_comments`
+--
+ALTER TABLE `story_comments`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_cmt_story_time` (`story_id`,`created_at`),
+  ADD KEY `idx_cmt_chapter_time` (`chapter_id`,`created_at`),
+  ADD KEY `idx_cmt_parent` (`parent_id`),
+  ADD KEY `idx_cmt_user` (`user_id`);
+
+--
+-- Chỉ mục cho bảng `story_ratings`
+--
+ALTER TABLE `story_ratings`
+  ADD PRIMARY KEY (`story_id`,`user_id`),
+  ADD KEY `idx_sr_user` (`user_id`),
+  ADD KEY `idx_sr_story_rating` (`story_id`,`rating`);
 
 --
 -- Chỉ mục cho bảng `story_views`
@@ -266,6 +341,12 @@ ALTER TABLE `stories`
   MODIFY `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT cho bảng `story_comments`
+--
+ALTER TABLE `story_comments`
+  MODIFY `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT cho bảng `story_views`
 --
 ALTER TABLE `story_views`
@@ -294,6 +375,13 @@ ALTER TABLE `chapter_images`
   ADD CONSTRAINT `fk_cimg_chapter` FOREIGN KEY (`chapter_id`) REFERENCES `chapters` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
+-- Các ràng buộc cho bảng `comment_likes`
+--
+ALTER TABLE `comment_likes`
+  ADD CONSTRAINT `fk_cl_comment` FOREIGN KEY (`comment_id`) REFERENCES `story_comments` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_cl_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
 -- Các ràng buộc cho bảng `reading_history`
 --
 ALTER TABLE `reading_history`
@@ -307,6 +395,22 @@ ALTER TABLE `reading_history`
 ALTER TABLE `story_categories`
   ADD CONSTRAINT `fk_sc_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_sc_story` FOREIGN KEY (`story_id`) REFERENCES `stories` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Các ràng buộc cho bảng `story_comments`
+--
+ALTER TABLE `story_comments`
+  ADD CONSTRAINT `fk_cmt_chapter` FOREIGN KEY (`chapter_id`) REFERENCES `chapters` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_cmt_parent` FOREIGN KEY (`parent_id`) REFERENCES `story_comments` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_cmt_story` FOREIGN KEY (`story_id`) REFERENCES `stories` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_cmt_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Các ràng buộc cho bảng `story_ratings`
+--
+ALTER TABLE `story_ratings`
+  ADD CONSTRAINT `fk_sr_story` FOREIGN KEY (`story_id`) REFERENCES `stories` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_sr_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
 -- Các ràng buộc cho bảng `story_views`

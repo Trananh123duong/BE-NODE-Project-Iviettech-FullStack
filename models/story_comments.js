@@ -52,7 +52,6 @@ module.exports = function(sequelize, DataTypes) {
     sequelize,
     tableName: 'story_comments',
     timestamps: true,
-    paranoid: true,
     indexes: [
       {
         name: "PRIMARY",

@@ -239,6 +239,7 @@ const rateStory = asyncHandler(async (req, res) => {
 // Lấy tổng quan rating (avg, count, phân phối 1..5)
 const getRatingSummary = asyncHandler(async (req, res) => {
   const storyId = Number(req.params.id)
+  const userId = req.user?.id || null
 
   const story = await Story.findByPk(storyId, {
     attributes: ['id', 'avg_rating', 'ratings_count']
@@ -256,12 +257,23 @@ const getRatingSummary = asyncHandler(async (req, res) => {
   const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
   for (const r of dist) distribution[String(r.rating)] = Number(r.count)
 
+  // rating của user hiện tại (nếu đăng nhập)
+  let user_rating = null
+  if (userId) {
+    const r = await StoryRating.findOne({
+      where: { story_id: storyId, user_id: userId },
+      attributes: ['rating'],
+      raw: true,
+    })
+    user_rating = r ? Number(r.rating) : null
+  }
 
   return res.status(200).json({
     story_id: story.id,
     avg_rating: Number(story.avg_rating),
     ratings_count: Number(story.ratings_count),
     distribution,
+    user_rating,
   })
 })
 

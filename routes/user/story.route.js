@@ -18,7 +18,7 @@ router.delete('/:storyId/follow', verifyToken, followCtrl.unfollowStory)
 // upsert chấm sao (1..5)
 router.post('/:id/rating', verifyToken, storyController.rateStory)
 // tổng quan rating (avg, count, phân phối 1..5)
-router.get('/:id/ratings/summary', storyController.getRatingSummary)
+router.get('/:id/ratings/summary', optionalAuth, storyController.getRatingSummary)
 // bình luận theo truyện (gom tất cả chapter; public/optionalAuth)
 router.get('/:id/comments', optionalAuth, storyController.getStoryComments)
 

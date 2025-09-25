@@ -1,6 +1,6 @@
 const asyncHandler = require('express-async-handler')
-const { NotFoundError } = require('../../utils/ApiError')
-const { Op, fn, col } = require('sequelize')
+const { ApiError, NotFoundError } = require('../../utils/ApiError')
+const { Op } = require('sequelize')
 
 const {
   chapters: Chapter,
@@ -38,10 +38,7 @@ const getChaptersByStory = asyncHandler(async (req, res) => {
     })
   }
 
-  return res.status(200).json({
-    chapters,
-    history,
-  })
+  return res.status(200).json({ chapters, history })
 })
 
 const getChapterDetail = asyncHandler(async (req, res) => {
@@ -64,12 +61,8 @@ const getChapterDetail = asyncHandler(async (req, res) => {
       },
     ],
   })
+  if (!chapter) throw new NotFoundError('Không tìm thấy chapter')
 
-  if (!chapter) {
-    throw new NotFoundError('Không tìm thấy chapter')
-  }
-
-  // Tìm chapter liền trước / liền sau trong cùng story dựa theo chapter_number
   const [prevChapter, nextChapter, story] = await Promise.all([
     Chapter.findOne({
       where: {
@@ -93,7 +86,7 @@ const getChapterDetail = asyncHandler(async (req, res) => {
         ['id', 'ASC'],
       ],
     }),
-    Story.findByPk(chapter.story_id, { attributes: ['id', 'name'] })
+    Story.findByPk(chapter.story_id, { attributes: ['id', 'name'] }),
   ])
 
   await StoryView.create({
@@ -159,14 +152,14 @@ const getChapterComments = asyncHandler(async (req, res) => {
     distinct: true,
   })
 
-  res.status(200).json({
+  return res.status(200).json({
     data: rows,
     meta: {
       total: count,
       page: Number(page),
       limit: Number(limit),
       totalPages: Math.ceil(count / Number(limit)),
-    }
+    },
   })
 })
 
@@ -174,11 +167,11 @@ const getChapterComments = asyncHandler(async (req, res) => {
 const createChapterComment = asyncHandler(async (req, res) => {
   const chapterId = Number(req.params.id)
   const userId = req.user?.id
-  const { body, parent_id = null, is_spoiler = false } = req.body || {}
+  const { body, parent_id = null } = req.body || {}
 
-  if (!userId) return res.status(401).json({ message: 'Cần đăng nhập' })
+  if (!userId) throw new ApiError(401, 'Cần đăng nhập')
   if (!body || String(body).trim().length === 0) {
-    return res.status(400).json({ message: 'Nội dung bình luận là bắt buộc' })
+    throw new ApiError(400, 'Nội dung bình luận là bắt buộc')
   }
 
   const chapter = await Chapter.findByPk(chapterId, { attributes: ['id', 'story_id'] })
@@ -188,20 +181,22 @@ const createChapterComment = asyncHandler(async (req, res) => {
   if (parent_id) {
     const parent = await StoryComment.findByPk(parent_id, { attributes: ['id', 'chapter_id'] })
     if (!parent || parent.chapter_id !== chapterId) {
-      return res.status(400).json({ message: 'parent_id không hợp lệ' })
+      throw new ApiError(400, 'parent_id không hợp lệ')
     }
   }
 
   let newComment
   await Story.sequelize.transaction(async (t) => {
-    newComment = await StoryComment.create({
-      story_id: chapter.story_id,
-      chapter_id: chapterId,
-      user_id: userId,
-      parent_id: parent_id || null,
-      body,
-      is_spoiler: !!is_spoiler,
-    }, { transaction: t })
+    newComment = await StoryComment.create(
+      {
+        story_id: chapter.story_id,
+        chapter_id: chapterId,
+        user_id: userId,
+        parent_id: parent_id || null,
+        body,
+      },
+      { transaction: t }
+    )
 
     // cập nhật đếm comment cho story và chapter
     const [storyCount, chapterCount] = await Promise.all([
@@ -222,14 +217,14 @@ const createChapterComment = asyncHandler(async (req, res) => {
 const deleteComment = asyncHandler(async (req, res) => {
   const id = Number(req.params.id)
   const userId = req.user?.id
-
-  if (!userId) return res.status(401).json({ message: 'Cần đăng nhập' })
+  if (!userId) throw new ApiError(401, 'Cần đăng nhập')
 
   const comment = await StoryComment.findByPk(id)
-  if (!comment) return res.status(404).json({ message: 'Không tìm thấy bình luận' })
+  if (!comment) throw new NotFoundError('Không tìm thấy bình luận')
+
   // cho phép chủ cmt hoặc admin (tuỳ bạn kiểm tra vai trò)
-  if (comment.user_id !== userId && !req.user?.role ) {
-    return res.status(403).json({ message: 'Không có quyền xoá bình luận này' })
+  if (comment.user_id !== userId && !req.user?.role) {
+    throw new ApiError(403, 'Không có quyền xoá bình luận này')
   }
 
   await Story.sequelize.transaction(async (t) => {
@@ -256,10 +251,10 @@ const deleteComment = asyncHandler(async (req, res) => {
 const toggleLikeComment = asyncHandler(async (req, res) => {
   const id = Number(req.params.id)
   const userId = req.user?.id
-  if (!userId) return res.status(401).json({ message: 'Cần đăng nhập' })
+  if (!userId) throw new ApiError(401, 'Cần đăng nhập')
 
   const comment = await StoryComment.findByPk(id)
-  if (!comment) return res.status(404).json({ message: 'Không tìm thấy bình luận' })
+  if (!comment) throw new NotFoundError('Không tìm thấy bình luận')
 
   const existed = await CommentLike.findOne({
     where: { comment_id: id, user_id: userId },

@@ -42,11 +42,6 @@ module.exports = function(sequelize, DataTypes) {
     body: {
       type: DataTypes.TEXT,
       allowNull: false
-    },
-    is_spoiler: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: 0
     }
   }, {
     sequelize,

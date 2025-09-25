@@ -7,7 +7,7 @@ router.get('/:id', optionalAuth, chapterController.getChapterDetail)
 
 // danh sách bình luận của 1 chapter (có phân trang)
 router.get('/:id/comments', optionalAuth, chapterController.getChapterComments)
-// tạo bình luận (comment gốc hoặc reply: body, parent_id?, is_spoiler?)
+// tạo bình luận (comment gốc hoặc reply: body, parent_id?)
 router.post('/:id/comments', verifyToken, chapterController.createChapterComment)
 // xoá mềm bình luận (chủ cmt hoặc admin)
 router.delete('/comments/:id', verifyToken, chapterController.deleteComment)

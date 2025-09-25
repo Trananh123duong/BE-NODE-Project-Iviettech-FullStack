@@ -1,7 +1,6 @@
-// controllers/story.controller.js
-const { fn, col, literal, Op, Transaction } = require('sequelize')
+const { fn, col, Op } = require('sequelize')
 const asyncHandler = require('express-async-handler')
-const { NotFoundError } = require('../../utils/ApiError')
+const { ApiError, NotFoundError } = require('../../utils/ApiError')
 
 const {
   stories: Story,
@@ -21,7 +20,7 @@ const getStoryList = asyncHandler(async (req, res) => {
     sort = 'id',
     order = 'desc',
     keyword,
-    status
+    status,
   } = req.query
   const categoryIds = req.query['categoryIds[]']
   const offset = (page - 1) * limit
@@ -116,7 +115,7 @@ const getStoryList = asyncHandler(async (req, res) => {
 
   const totalPages = Math.ceil(result.count / parseInt(limit, 10))
 
-  res.status(200).json({
+  return res.status(200).json({
     data: result.rows,
     meta: {
       total: result.count,
@@ -164,10 +163,7 @@ const getStoryDetail = asyncHandler(async (req, res) => {
       },
     ],
   })
-
-  if (!story) {
-    throw new NotFoundError('Không tìm thấy truyện')
-  }
+  if (!story) throw new NotFoundError('Không tìm thấy truyện')
 
   let is_followed = false
   if (userId) {
@@ -182,7 +178,7 @@ const getStoryDetail = asyncHandler(async (req, res) => {
   const payload = story.toJSON()
   payload.is_followed = is_followed
 
-  res.status(200).json(payload)
+  return res.status(200).json(payload)
 })
 
 // Upsert chấm sao truyện + cập nhật avg & count
@@ -191,14 +187,15 @@ const rateStory = asyncHandler(async (req, res) => {
   const userId = req.user?.id
   const { rating } = req.body
 
-  if (!userId) return res.status(401).json({ message: 'Cần đăng nhập' })
+  if (!userId) throw new ApiError(401, 'Cần đăng nhập')
+
   const r = Number(rating)
   if (!Number.isInteger(r) || r < 1 || r > 5) {
-    return res.status(400).json({ message: 'rating phải trong khoảng 1..5' })
+    throw new ApiError(400, 'rating phải trong khoảng 1..5')
   }
 
   const story = await Story.findByPk(storyId)
-  if (!story) return res.status(404).json({ message: 'Không tìm thấy truyện' })
+  if (!story) throw new NotFoundError('Không tìm thấy truyện')
 
   await Story.sequelize.transaction(async (t) => {
     // upsert rating
@@ -244,7 +241,7 @@ const getRatingSummary = asyncHandler(async (req, res) => {
   const story = await Story.findByPk(storyId, {
     attributes: ['id', 'avg_rating', 'ratings_count']
   })
-  if (!story) return res.status(404).json({ message: 'Không tìm thấy truyện' })
+  if (!story) throw new NotFoundError('Không tìm thấy truyện')
 
   // phân phối 1..5
   const dist = await StoryRating.findAll({
@@ -284,7 +281,7 @@ const getStoryComments = asyncHandler(async (req, res) => {
   const userId = req.user?.id || null
 
   const story = await Story.findByPk(storyId)
-  if (!story) return res.status(404).json({ message: 'Không tìm thấy truyện' })
+  if (!story) throw new NotFoundError('Không tìm thấy truyện')
 
   const offset = (Number(page) - 1) * Number(limit)
   const orderClause = String(order).toLowerCase() === 'asc' ? 'ASC' : 'DESC'
@@ -308,7 +305,7 @@ const getStoryComments = asyncHandler(async (req, res) => {
     distinct: true,
   })
 
-  res.status(200).json({
+  return res.status(200).json({
     data: rows,
     meta: {
       total: count,

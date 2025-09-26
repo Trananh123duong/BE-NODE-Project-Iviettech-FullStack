@@ -1,6 +1,6 @@
 const asyncHandler = require('express-async-handler')
 const { ApiError, NotFoundError } = require('../../utils/ApiError')
-const { Op } = require('sequelize')
+const { Op, Sequelize } = require('sequelize')
 
 const {
   chapters: Chapter,
@@ -127,6 +127,7 @@ const getChapterDetail = asyncHandler(async (req, res) => {
 const getChapterComments = asyncHandler(async (req, res) => {
   const { page = 1, limit = 20, order = 'desc' } = req.query
   const chapterId = Number(req.params.id)
+  const userId = req.user?.id ? Number(req.user.id) : null
 
   const chapter = await Chapter.findByPk(chapterId, { attributes: ['id', 'story_id'] })
   if (!chapter) throw new NotFoundError('Không tìm thấy chapter')
@@ -134,6 +135,7 @@ const getChapterComments = asyncHandler(async (req, res) => {
   const offset = (Number(page) - 1) * Number(limit)
   const orderClause = String(order).toLowerCase() === 'asc' ? 'ASC' : 'DESC'
 
+  // 1) Lấy comment gốc + reply (1 cấp)
   const { rows, count } = await StoryComment.findAndCountAll({
     where: { chapter_id: chapterId, parent_id: null },
     include: [
@@ -143,7 +145,7 @@ const getChapterComments = asyncHandler(async (req, res) => {
         as: 'story_comments',
         include: [{ model: User, as: 'user', attributes: ['id', 'username', 'avatar'] }],
         separate: true,
-        order: [['created_at', 'ASC']],
+        order: [['created_at', 'ASC'], ['id', 'ASC']],
       },
     ],
     order: [['created_at', orderClause], ['id', orderClause]],
@@ -152,8 +154,59 @@ const getChapterComments = asyncHandler(async (req, res) => {
     distinct: true,
   })
 
+  // 2) Gom tất cả ID (gốc + reply)
+  const allIds = []
+  for (const c of rows) {
+    allIds.push(c.id)
+    if (Array.isArray(c.story_comments)) {
+      for (const r of c.story_comments) allIds.push(r.id)
+    }
+  }
+
+  // 3) Lấy map đếm like và set các comment user đã like
+  let likeCountMap = new Map()
+  let likedSet = new Set()
+
+  if (allIds.length > 0) {
+    // 3a) Tổng like theo comment_id
+    const likeCounts = await CommentLike.findAll({
+      where: { comment_id: { [Op.in]: allIds } },
+      attributes: ['comment_id', [CommentLike.sequelize.fn('COUNT', CommentLike.sequelize.col('*')), 'cnt']],
+      group: ['comment_id'],
+      raw: true,
+    })
+    for (const row of likeCounts) {
+      likeCountMap.set(Number(row.comment_id), Number(row.cnt))
+    }
+
+    // 3b) Những comment user hiện tại đã like
+    if (userId) {
+      const likedRows = await CommentLike.findAll({
+        where: { user_id: userId, comment_id: { [Op.in]: allIds } },
+        attributes: ['comment_id'],
+        raw: true,
+      })
+      likedSet = new Set(likedRows.map(r => Number(r.comment_id)))
+    }
+  }
+
+  // 4) Gắn likes_count + is_liked vào payload trả về
+  const data = rows.map((c) => {
+    const parent = c.toJSON()
+    parent.likes_count = likeCountMap.get(c.id) || 0
+    parent.is_liked = likedSet.has(c.id)
+
+    parent.story_comments = (parent.story_comments || []).map((r) => ({
+      ...r,
+      likes_count: likeCountMap.get(r.id) || 0,
+      is_liked: likedSet.has(r.id),
+    }))
+
+    return parent
+  })
+
   return res.status(200).json({
-    data: rows,
+    data,
     meta: {
       total: count,
       page: Number(page),
@@ -247,27 +300,36 @@ const deleteComment = asyncHandler(async (req, res) => {
   return res.status(200).json({ message: 'Đã xoá bình luận' })
 })
 
-// Thích / bỏ thích bình luận
-const toggleLikeComment = asyncHandler(async (req, res) => {
+// Thích bình luận
+const likeComment = asyncHandler(async (req, res) => {
   const id = Number(req.params.id)
   const userId = req.user?.id
   if (!userId) throw new ApiError(401, 'Cần đăng nhập')
 
-  const comment = await StoryComment.findByPk(id)
+  const comment = await StoryComment.findByPk(id, { attributes: ['id'] })
   if (!comment) throw new NotFoundError('Không tìm thấy bình luận')
 
-  const existed = await CommentLike.findOne({
+  await CommentLike.findOrCreate({
     where: { comment_id: id, user_id: userId },
-    attributes: ['comment_id'],
+    defaults: { comment_id: id, user_id: userId },
   })
 
-  if (existed) {
-    await existed.destroy()
-    return res.status(200).json({ liked: false })
-  } else {
-    await CommentLike.create({ comment_id: id, user_id: userId })
-    return res.status(200).json({ liked: true })
-  }
+  const likes_count = await CommentLike.count({ where: { comment_id: id } })
+  return res.status(200).json({ is_liked: true, likes_count })
+})
+
+const unlikeComment = asyncHandler(async (req, res) => {
+  const id = Number(req.params.id)
+  const userId = req.user?.id
+  if (!userId) throw new ApiError(401, 'Cần đăng nhập')
+
+  const comment = await StoryComment.findByPk(id, { attributes: ['id'] })
+  if (!comment) throw new NotFoundError('Không tìm thấy bình luận')
+
+  await CommentLike.destroy({ where: { comment_id: id, user_id: userId } })
+
+  const likes_count = await CommentLike.count({ where: { comment_id: id } })
+  return res.status(200).json({ is_liked: false, likes_count })
 })
 
 module.exports = {
@@ -276,5 +338,6 @@ module.exports = {
   getChapterComments,
   createChapterComment,
   deleteComment,
-  toggleLikeComment,
+  likeComment,
+  unlikeComment
 }

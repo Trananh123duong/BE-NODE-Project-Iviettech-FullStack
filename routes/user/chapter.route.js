@@ -11,7 +11,8 @@ router.get('/:id/comments', optionalAuth, chapterController.getChapterComments)
 router.post('/:id/comments', verifyToken, chapterController.createChapterComment)
 // xoá mềm bình luận (chủ cmt hoặc admin)
 router.delete('/comments/:id', verifyToken, chapterController.deleteComment)
-// like / bỏ like bình luận (toggle)
-router.post('/comments/:id/like', verifyToken, chapterController.toggleLikeComment)
+// like / bỏ like bình luận
+router.post('/comments/:id/like', verifyToken, chapterController.likeComment)
+router.delete('/comments/:id/like', verifyToken, chapterController.unlikeComment)
 
 module.exports = router

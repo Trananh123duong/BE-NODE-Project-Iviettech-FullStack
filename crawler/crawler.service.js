@@ -58,10 +58,60 @@ async function attachStoryCategories(storyId, categoryIds) {
   }
 }
 
+async function ensureStoryFromDetail(storyDetail, slug) {
+  // 1) Categories
+  const categoryNames = storyDetail.item.category?.map((c) => c.name) || [];
+  const categoryIds = await findOrCreateCategories(categoryNames);
+
+  // 2) Story
+  const author = Array.isArray(storyDetail.item.author)
+    ? storyDetail.item.author.join(', ')
+    : (storyDetail.item.author || '');
+
+  let story = await models.stories.findOne({
+    where: { name: storyDetail.item.name }
+  });
+  if (!story) {
+    story = await models.stories.create({
+      name: storyDetail.item.name,
+      author,
+      description: storyDetail.item.content || null,
+      status: storyDetail.item.status || 'ONGOING',
+      thumbnail: null
+    });
+  }
+
+  // 3) Story-Categories
+  await attachStoryCategories(story.id, categoryIds);
+
+  // 4) Thumbnail (best-effort)
+  const thumb = storyDetail.seoOnPage?.seoSchema?.image;
+  if (thumb && !story.thumbnail) {
+    try {
+      const ext = path.extname(thumb).split('?')[0] || '.jpg';
+      const baseSlug = safeSlug(slug);
+      const rand = crypto.randomBytes(4).toString('hex');
+      const fileName = `${baseSlug}-${rand}${ext}`;
+
+      const rel = path.join('uploads', 'thumbnails', fileName);
+      await downloadImageTo(thumb, path.join(process.cwd(), rel));
+
+      await models.stories.update(
+        { thumbnail: `/${rel.replace(/\\+/g, '/')}` },
+        { where: { id: story.id } }
+      );
+    } catch (e) {
+      console.warn(`Thumbnail error [${story.id}]:`, e?.message || e);
+    }
+  }
+
+  return story;
+}
+
 async function crawlChapterImages(chapterApiUrl, chapterId) {
   const res = await axios.get(chapterApiUrl);
   const data = res.data?.data;
-  if (!data?.item?.chapter_image) return;
+  if (!data?.item?.chapter_image) return 0;
 
   const domain = String(data.domain_cdn || '').replace(/\/$/, '');
   const chapterPath = String(data.item.chapter_path || '').replace(/^\/|\/$/g, '');
@@ -73,6 +123,7 @@ async function crawlChapterImages(chapterApiUrl, chapterId) {
   });
   let base = Number.isFinite(lastSort) ? Number(lastSort) + 1 : 0;
 
+  let created = 0;
   for (let i = 0; i < list.length; i++) {
     const img = list[i];
     const fullUrl = `${domain}/${chapterPath}/${img.image_file}`;
@@ -90,8 +141,89 @@ async function crawlChapterImages(chapterApiUrl, chapterId) {
         sort_order: base,
       });
       base += 1;
+      created += 1;
     }
   }
+  return created;
+}
+
+/**
+ * Crawl đúng 1 chapter theo slug + chapterNumber (khớp với item.server_data[].chapter_name)
+ * @param {string} slug
+ * @param {number|string} chapterNumber - ví dụ 1, 12, 12.5
+ * @returns { story_id, chapter_id, chapter_number, images_added }
+ */
+async function crawlSingleChapter(slug, chapterNumber) {
+  const raw = String(chapterNumber ?? '').trim();
+  if (!slug?.trim()) throw new BadRequestError('Thiếu slug');
+  if (!raw) throw new BadRequestError('Thiếu chapterNumber');
+
+  const targetNum = parseFloat(raw);
+  if (!Number.isFinite(targetNum)) {
+    throw new BadRequestError('chapterNumber không hợp lệ (phải là số, ví dụ 1, 12, 12.5)');
+  }
+
+  // 1) Lấy detail từ API để tìm chapter tương ứng
+  let storyDetail;
+  try {
+    const response = await axios.get(`${OTRUYEN_API}/truyen-tranh/${slug}`);
+    storyDetail = response.data?.data;
+  } catch (err) {
+    if (axios.isAxiosError(err)) throw new ApiError(502, `OTruyen API lỗi: ${err.message}`);
+    throw err;
+  }
+  if (!storyDetail?.item) throw new NotFoundError(`Không tìm thấy truyện với slug: ${slug}`);
+
+  // 2) Tìm chapter khớp chapter_name ~ targetNum (duyệt tất cả server)
+  let found = null;
+  for (const server of storyDetail.item.chapters || []) {
+    for (const ch of server.server_data || []) {
+      const chNumber = parseFloat(ch.chapter_name);
+      if (Number.isFinite(chNumber) && chNumber === targetNum) {
+        found = ch;
+        break;
+      }
+    }
+    if (found) break;
+  }
+  if (!found) {
+    throw new NotFoundError(`Không tìm thấy chapter ${targetNum} cho slug: ${slug}`);
+  }
+  if (!found.chapter_api_data) {
+    throw new NotFoundError(`Chapter ${targetNum} không có dữ liệu ảnh (chapter_api_data rỗng)`);
+  }
+
+  // 3) Đảm bảo story tồn tại (không tạo các chapter khác)
+  const story = await ensureStoryFromDetail(storyDetail, slug);
+
+  // 4) Tạo/tìm chapter hiện tại
+  let chapter = await models.chapters.findOne({
+    where: { story_id: story.id, chapter_number: targetNum },
+    attributes: ['id', 'chapter_number']
+  });
+  if (!chapter) {
+    chapter = await models.chapters.create({
+      story_id: story.id,
+      chapter_number: targetNum,
+      title: found.chapter_title || ''
+    });
+  }
+
+  // 5) Crawl ảnh cho đúng chapter này
+  let images_added = 0;
+  try {
+    images_added = await crawlChapterImages(found.chapter_api_data, chapter.id);
+  } catch (e) {
+    console.warn(`Chapter images error [chapter=${chapter.id}]:`, e?.message || e);
+    // Cho phép trả về dù không thêm được ảnh
+  }
+
+  return {
+    story_id: story.id,
+    chapter_id: chapter.id,
+    chapter_number: chapter.chapter_number,
+    images_added
+  };
 }
 
 async function crawlStoryDetail(slug) {
@@ -213,4 +345,8 @@ async function crawlAllStory(pages = 5) {
   return { pages: p, total: processed.length, processed };
 }
 
-module.exports = { crawlStoryDetail, crawlAllStory };
+module.exports = {
+  crawlStoryDetail,
+  crawlAllStory,
+  crawlSingleChapter,
+};

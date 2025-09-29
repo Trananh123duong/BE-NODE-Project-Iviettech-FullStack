@@ -15,4 +15,14 @@ const crawlPages = asyncHandler(async (req, res) => {
   res.json({ ok: true, ...summary });
 });
 
-module.exports = { crawlBySlug, crawlPages };
+const crawlOneChapter = asyncHandler(async (req, res) => {
+  const slug = String(req.params.slug || req.query.slug || '').trim();
+  const chapterNumber = req.params.chapter || req.query.chapter;
+  if (!slug) throw new BadRequestError('Thiếu slug');
+  if (chapterNumber === undefined) throw new BadRequestError('Thiếu chapter');
+
+  const result = await crawlSingleChapter(slug, chapterNumber);
+  res.json({ ok: true, ...result });
+});
+
+module.exports = { crawlBySlug, crawlPages, crawlOneChapter };

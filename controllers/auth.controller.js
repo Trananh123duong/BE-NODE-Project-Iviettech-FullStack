@@ -60,6 +60,18 @@ const login = asyncHandler(async (req, res) => {
   });
 });
 
+const logout = asyncHandler(async (req, res) => {
+  const userId = req.user?.id;
+  if (!userId) throw new UnauthorizedError('Chưa đăng nhập');
+
+  const user = await User.findByPk(userId);
+  if (!user) throw new UnauthorizedError('Không tìm thấy người dùng');
+
+  await user.update({ refresh_token: null });
+
+  return res.status(200).json({ message: 'Đã đăng xuất' });
+});
+
 const getMyProfile = asyncHandler(async (req, res) => {
   const userId = req.user.id
   const user = await User.findByPk(userId, {
@@ -141,6 +153,38 @@ const updateProfile = asyncHandler(async (req, res) => {
   });
 });
 
+const changePassword = asyncHandler(async (req, res) => {
+  const userId = req.user?.id;
+  const { currentPassword, newPassword } = req.body || {};
+
+  if (!userId) throw new UnauthorizedError('Chưa đăng nhập');
+  if (!currentPassword || !newPassword) {
+    throw new BadRequestError('Thiếu currentPassword hoặc newPassword');
+  }
+  if (typeof newPassword !== 'string' || newPassword.length < 8) {
+    throw new BadRequestError('Mật khẩu mới phải có ít nhất 8 ký tự');
+  }
+  if (newPassword === currentPassword) {
+    throw new BadRequestError('Mật khẩu mới không được trùng mật khẩu hiện tại');
+  }
+
+  const user = await User.findByPk(userId);
+  if (!user) throw new UnauthorizedError('Không tìm thấy người dùng');
+
+  const ok = await bcrypt.compare(currentPassword, user.password);
+  if (!ok) throw new UnauthorizedError('Mật khẩu hiện tại không đúng');
+
+  const salt = await bcrypt.genSalt(10);
+  const hashed = await bcrypt.hash(newPassword, salt);
+
+  // Lưu mật khẩu mới và vô hiệu hóa refresh token cũ
+  await user.update({ password: hashed, refresh_token: null });
+
+  return res.status(200).json({
+    message: 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại để tiếp tục.'
+  });
+});
+
 const uploadAvatar = asyncHandler(async (req, res) => {
   const userId = req.user?.id
   if (!userId) throw new UnauthorizedError('Chưa đăng nhập')
@@ -179,5 +223,7 @@ module.exports = {
   getMyProfile,
   refreshAccessToken,
   updateProfile,
-  uploadAvatar
+  uploadAvatar,
+  changePassword,
+  logout
 };

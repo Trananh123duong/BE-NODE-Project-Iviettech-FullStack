@@ -8,7 +8,7 @@ const { avatarUploads } = require('../middleware/upload')
 router.post('/register', authController.register)
 router.post('/login', authController.login)
 router.get('/my-profile', verifyToken , authController.getMyProfile)
-router.get('/refresh', verifyToken, authController.refreshAccessToken)
+router.post('/refresh', verifyToken, authController.refreshAccessToken)
 router.patch('/my-profile', verifyToken, authController.updateProfile)
 router.post(
   '/upload-avatar',
@@ -16,5 +16,7 @@ router.post(
   avatarUploads.single('avatar'),
   authController.uploadAvatar
 )
+router.patch('/change-password', verifyToken, authController.changePassword)
+router.post('/logout', verifyToken, authController.logout)
 
 module.exports = router

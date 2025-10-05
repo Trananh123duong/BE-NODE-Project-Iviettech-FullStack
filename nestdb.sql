@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Máy chủ: mysql:3306
--- Thời gian đã tạo: Th9 25, 2025 lúc 02:03 PM
+-- Thời gian đã tạo: Th10 05, 2025 lúc 08:46 AM
 -- Phiên bản máy phục vụ: 8.0.41
 -- Phiên bản PHP: 8.2.27
 
@@ -184,6 +184,8 @@ CREATE TABLE `users` (
   `avatar` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `role` enum('user','admin') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'user',
   `refresh_token` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `vip_started_at` datetime DEFAULT NULL,
+  `vip_expires_at` datetime DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -200,6 +202,28 @@ CREATE TABLE `user_follows` (
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `vip_purchases`
+--
+
+CREATE TABLE `vip_purchases` (
+  `id` bigint UNSIGNED NOT NULL,
+  `user_id` bigint UNSIGNED NOT NULL,
+  `plan_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'VIP30',
+  `duration_days` int UNSIGNED NOT NULL DEFAULT '30',
+  `price` int UNSIGNED NOT NULL DEFAULT '0',
+  `currency` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'VND',
+  `status` enum('PAID','CANCELLED') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'PAID',
+  `started_at` datetime NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `paid_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `note` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Chỉ mục cho các bảng đã đổ
@@ -294,7 +318,8 @@ ALTER TABLE `story_views`
 ALTER TABLE `users`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `username` (`username`),
-  ADD UNIQUE KEY `email` (`email`);
+  ADD UNIQUE KEY `email` (`email`),
+  ADD KEY `idx_users_vip_expires` (`vip_expires_at`);
 
 --
 -- Chỉ mục cho bảng `user_follows`
@@ -303,6 +328,13 @@ ALTER TABLE `user_follows`
   ADD PRIMARY KEY (`user_id`,`story_id`),
   ADD KEY `idx_uf_user` (`user_id`),
   ADD KEY `idx_uf_story` (`story_id`);
+
+--
+-- Chỉ mục cho bảng `vip_purchases`
+--
+ALTER TABLE `vip_purchases`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_vip_user_time` (`user_id`,`paid_at`);
 
 --
 -- AUTO_INCREMENT cho các bảng đã đổ
@@ -354,6 +386,12 @@ ALTER TABLE `story_views`
 -- AUTO_INCREMENT cho bảng `users`
 --
 ALTER TABLE `users`
+  MODIFY `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT cho bảng `vip_purchases`
+--
+ALTER TABLE `vip_purchases`
   MODIFY `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
@@ -422,6 +460,12 @@ ALTER TABLE `story_views`
 ALTER TABLE `user_follows`
   ADD CONSTRAINT `fk_uf_story` FOREIGN KEY (`story_id`) REFERENCES `stories` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_uf_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Ràng buộc cho bảng `vip_purchases`
+--
+ALTER TABLE `vip_purchases`
+  ADD CONSTRAINT `fk_vip_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

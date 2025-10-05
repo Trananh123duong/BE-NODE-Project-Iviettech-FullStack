@@ -13,6 +13,7 @@ const userPageStoryRoutes = require('./routes/user/story.route')
 const userPageChapterRoutes = require('./routes/user/chapter.route')
 const userPageHistoryRoutes = require('./routes/user/history.route')
 const userPageFollowRoutes = require('./routes/user/follow.route')
+const userPageVipRoutes = require('./routes/user/vip.route')
 
 const errorHandler = require('./middleware/errorHandler');
 
@@ -32,6 +33,7 @@ app.use('/api/stories', userPageStoryRoutes);
 app.use('/api/chapters', userPageChapterRoutes);
 app.use('/api/me/history', userPageHistoryRoutes);
 app.use('/api/me/follow', userPageFollowRoutes);
+app.use('/api/vip', userPageVipRoutes)
 
 app.use(errorHandler);
 

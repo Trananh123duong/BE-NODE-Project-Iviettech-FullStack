@@ -11,6 +11,7 @@ var _story_ratings = require("./story_ratings");
 var _story_views = require("./story_views");
 var _user_follows = require("./user_follows");
 var _users = require("./users");
+var _vip_purchases = require("./vip_purchases");
 
 function initModels(sequelize) {
   var categories = _categories(sequelize, DataTypes);
@@ -25,6 +26,7 @@ function initModels(sequelize) {
   var story_views = _story_views(sequelize, DataTypes);
   var user_follows = _user_follows(sequelize, DataTypes);
   var users = _users(sequelize, DataTypes);
+  var vip_purchases = _vip_purchases(sequelize, DataTypes);
 
   categories.belongsToMany(stories, { as: 'story_id_stories', through: story_categories, foreignKey: "category_id", otherKey: "story_id" });
   stories.belongsToMany(categories, { as: 'category_id_categories', through: story_categories, foreignKey: "story_id", otherKey: "category_id" });
@@ -70,6 +72,8 @@ function initModels(sequelize) {
   users.hasMany(story_ratings, { as: "story_ratings", foreignKey: "user_id"});
   user_follows.belongsTo(users, { as: "user", foreignKey: "user_id"});
   users.hasMany(user_follows, { as: "user_follows", foreignKey: "user_id"});
+  vip_purchases.belongsTo(users, { as: "user", foreignKey: "user_id"});
+  users.hasMany(vip_purchases, { as: "vip_purchases", foreignKey: "user_id"});
 
   return {
     categories,
@@ -84,6 +88,7 @@ function initModels(sequelize) {
     story_views,
     user_follows,
     users,
+    vip_purchases,
   };
 }
 module.exports = initModels;

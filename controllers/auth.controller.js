@@ -47,6 +47,8 @@ const login = asyncHandler(async (req, res) => {
 
   await user.update({ refresh_token: refreshToken });
 
+  const isVip = computeIsVip(user)
+
   res.status(200).json({
     message: 'Login successful',
     user: {
@@ -54,6 +56,9 @@ const login = asyncHandler(async (req, res) => {
       username: user.username,
       email: user.email,
       role: user.role,
+      vip_started_at: user.vip_started_at,
+      vip_expires_at: user.vip_expires_at,
+      isVip,
     },
     accessToken,
     refreshToken,
@@ -72,12 +77,16 @@ const logout = asyncHandler(async (req, res) => {
   return res.status(200).json({ message: 'Đã đăng xuất' });
 });
 
+function computeIsVip(user) {
+  return !!user?.vip_expires_at && new Date(user.vip_expires_at) > new Date()
+}
+
 const getMyProfile = asyncHandler(async (req, res) => {
-  const userId = req.user.id
-  const user = await User.findByPk(userId, {
-    attributes: { exclude: ['password'] }, // Exclude password from response
+  const user = await User.findByPk(req.user.id, {
+    attributes: { exclude: ['password', 'refresh_token'] }
   })
-  res.status(200).json(user)
+  const isVip = !!user?.vip_expires_at && new Date(user.vip_expires_at) > new Date()
+  res.status(200).json({ ...user.toJSON(), isVip })
 })
 
 const refreshAccessToken = asyncHandler(async (req, res) => {

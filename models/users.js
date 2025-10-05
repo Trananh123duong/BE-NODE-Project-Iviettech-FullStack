@@ -33,6 +33,14 @@ module.exports = function(sequelize, DataTypes) {
     refresh_token: {
       type: DataTypes.TEXT,
       allowNull: true
+    },
+    vip_started_at: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+    vip_expires_at: {
+      type: DataTypes.DATE,
+      allowNull: true
     }
   }, {
     sequelize,
@@ -61,6 +69,13 @@ module.exports = function(sequelize, DataTypes) {
         using: "BTREE",
         fields: [
           { name: "email" },
+        ]
+      },
+      {
+        name: "idx_users_vip_expires",
+        using: "BTREE",
+        fields: [
+          { name: "vip_expires_at" },
         ]
       },
     ]

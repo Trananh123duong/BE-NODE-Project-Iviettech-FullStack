@@ -3,7 +3,6 @@ const asyncHandler = require('express-async-handler')
 const {
   users: User,
   vip_purchases: VipPurchase,
-  sequelize
 } = require('../../models')
 
 /**
@@ -53,35 +52,33 @@ const fakeCheckout = asyncHandler(async (req, res) => {
   const NOTE = req.body?.note || 'Fake payment (click-to-pay)'
   const DURATION = 30
 
-  await sequelize.transaction(async (t) => {
-    // Khóa bản ghi user để tránh race condition khi spam nút thanh toán
-    const user = await User.findByPk(userId, { transaction: t, lock: t.LOCK.UPDATE })
-    if (!user) {
-      // Không dùng ApiError ở đây để tránh import thêm; bạn có thể đổi sang NotFoundError nếu muốn
-      throw new Error('User not found')
-    }
+  // Khóa bản ghi user để tránh race condition khi spam nút thanh toán
+  const user = await User.findByPk(userId)
+  if (!user) {
+    // Không dùng ApiError ở đây để tránh import thêm; bạn có thể đổi sang NotFoundError nếu muốn
+    throw new Error('User not found')
+  }
 
-    const { start, end } = calcNextWindow(user.vip_expires_at, DURATION)
+  const { start, end } = calcNextWindow(user.vip_expires_at, DURATION)
 
-    // Ghi log mua VIP
-    await VipPurchase.create({
-      user_id: userId,
-      plan_code: 'VIP30',
-      duration_days: DURATION,
-      price: PRICE,
-      currency: 'VND',
-      status: 'PAID',
-      started_at: start,
-      expires_at: end,
-      note: NOTE,
-      paid_at: new Date()
-    }, { transaction: t })
+  // Ghi log mua VIP
+  await VipPurchase.create({
+    user_id: userId,
+    plan_code: 'VIP30',
+    duration_days: DURATION,
+    price: PRICE,
+    currency: 'VND',
+    status: 'PAID',
+    started_at: start,
+    expires_at: end,
+    note: NOTE,
+    paid_at: new Date()
+  })
 
-    // Cập nhật user
-    await user.update({
-      vip_started_at: start,
-      vip_expires_at: end
-    }, { transaction: t })
+  // Cập nhật user
+  await user.update({
+    vip_started_at: start,
+    vip_expires_at: end
   })
 
   return res.status(200).json({

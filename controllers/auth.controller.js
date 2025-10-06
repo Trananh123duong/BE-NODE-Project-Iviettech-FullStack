@@ -170,8 +170,8 @@ const changePassword = asyncHandler(async (req, res) => {
   if (!currentPassword || !newPassword) {
     throw new BadRequestError('Thiếu currentPassword hoặc newPassword');
   }
-  if (typeof newPassword !== 'string' || newPassword.length < 8) {
-    throw new BadRequestError('Mật khẩu mới phải có ít nhất 8 ký tự');
+  if (typeof newPassword !== 'string' || newPassword.length < 6) {
+    throw new BadRequestError('Mật khẩu mới phải có ít nhất 6 ký tự');
   }
   if (newPassword === currentPassword) {
     throw new BadRequestError('Mật khẩu mới không được trùng mật khẩu hiện tại');

@@ -202,7 +202,7 @@ const uploadAvatar = asyncHandler(async (req, res) => {
   const user = await User.findByPk(userId)
   if (!user) throw new UnauthorizedError('Không tìm thấy người dùng')
 
-  // Xoá file avatar cũ (nếu là file local trong /uploads/avatar)
+  // Xoá file avatar cũ trong /uploads/avatar
   try {
     const old = user.avatar
     if (old && /^\/?uploads\/avatar\//.test(old)) {
@@ -210,15 +210,12 @@ const uploadAvatar = asyncHandler(async (req, res) => {
       if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath)
     }
   } catch (e) {
-    // không chặn flow nếu xoá thất bại
     console.error('Remove old avatar failed:', e?.message || e)
   }
 
-  // Lưu đường dẫn mới (dùng prefix / để khớp util toAbsolute trên FE)
   const storedPath = `/uploads/avatar/${req.file.filename}`
   await user.update({ avatar: storedPath })
 
-  // trả về user safe
   const { password, refresh_token, ...safeUser } = user.toJSON()
   res.status(200).json({
     message: 'Tải lên avatar thành công',

@@ -8,7 +8,7 @@ const { categories: Category } = require('../../models')
 
 const getAllCategories = asyncHandler(async (req, res) => {
   const categories = await Category.findAll({
-    attributes: ['id', 'name'],
+    attributes: ['id', 'name'], //các field muốn lấy
     order: [['id', 'ASC']], 
   })
 

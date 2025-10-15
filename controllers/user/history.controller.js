@@ -27,7 +27,12 @@ const listMyHistory = asyncHandler(async (req, res) => {
     where: { user_id: userId },
     attributes: ['id', 'user_id', 'story_id', 'chapter_id', 'last_read_at'],
     include: [
-      storyInclude,
+      {
+        model: Story,
+        as: 'story',
+        attributes: ['id', 'name', 'thumbnail', 'author', 'status', 'total_view', 'total_follow', 'updated_at'],
+        required: true,
+      },
       {
         model: Chapter,
         as: 'chapter',
@@ -38,8 +43,6 @@ const listMyHistory = asyncHandler(async (req, res) => {
     order: [['last_read_at', 'DESC'], ['story', 'updated_at', 'DESC']],
     limit: parseInt(limit, 10),
     offset: parseInt(offset, 10),
-    distinct: true,
-    subQuery: false,
   })
 
   const totalPages = Math.ceil(result.count / parseInt(limit, 10))

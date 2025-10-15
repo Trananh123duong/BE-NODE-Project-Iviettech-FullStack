@@ -8,15 +8,6 @@ const listMyFollowedStories = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10 } = req.query
   const offset = (Number(page) - 1) * Number(limit)
 
-  const chapterInclude = {
-    model: Chapter,
-    as: 'chapters',
-    order: [['id', 'DESC']],
-    limit: 3,
-    separate: true,
-    required: false,
-  }
-
   const result = await Story.findAndCountAll({
     include: [
       {
@@ -26,13 +17,16 @@ const listMyFollowedStories = asyncHandler(async (req, res) => {
         where: { user_id: userId },
         required: true,
       },
-      chapterInclude,
+      {
+        model: Chapter,
+        as: 'chapters',
+        order: [['id', 'DESC']],
+        limit: 3,
+      },
     ],
     order: [[{ model: UserFollow, as: 'user_follows' }, 'created_at', 'DESC']],
     limit: parseInt(limit, 10),
     offset: parseInt(offset, 10),
-    distinct: true,
-    subQuery: false,
   })
 
   const totalPages = Math.ceil(result.count / parseInt(limit, 10))
@@ -55,7 +49,7 @@ const followStory = asyncHandler(async (req, res) => {
   const story = await Story.findByPk(storyId, { attributes: ['id'] })
   if (!story) throw new NotFoundError('Không tìm thấy truyện')
 
-  const [row, created] = await UserFollow.findOrCreate({
+  const [created] = await UserFollow.findOrCreate({
     where: { user_id: userId, story_id: storyId },
     defaults: { user_id: userId, story_id: storyId },
   })

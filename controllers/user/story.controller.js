@@ -28,11 +28,9 @@ const getStoryList = asyncHandler(async (req, res) => {
   let whereClause = {}
   if (keyword) {
     whereClause.name = { [Op.like]: `%${keyword}%` }
-    // có thể mở rộng:
-    // whereClause = { [Op.or]: [{ name: { [Op.like]: `%${keyword}%` } }, { author: { [Op.like]: `%${keyword}%` } }] }
   }
 
-  // lọc theo status (FE không gửi khi = 'all')
+  // lọc theo status trạng thái
   const ALLOWED_STATUS = ['coming_soon', 'ongoing', 'completed']
   if (status && ALLOWED_STATUS.includes(status)) {
     whereClause.status = status
@@ -44,7 +42,7 @@ const getStoryList = asyncHandler(async (req, res) => {
     as: 'category_id_categories',
     attributes: ['id', 'name'],
     through: { attributes: [] }, // ẩn cột bảng trung gian
-    required: false,
+    required: false, //Story nào không có Category vẫn hiện ra.
   }
 
   // nếu có categoryIds[] thì lọc many-to-many qua include.where
@@ -56,7 +54,7 @@ const getStoryList = asyncHandler(async (req, res) => {
       categoryInclude = {
         ...categoryInclude,
         where: { id: { [Op.in]: safeIds } },
-        required: true, // bắt buộc khớp category khi lọc
+        required: true, // chỉ muốn lấy những Story có category id nằm trong safeIds
       }
     }
   }
@@ -65,7 +63,6 @@ const getStoryList = asyncHandler(async (req, res) => {
   const chapterInclude = {
     model: Chapter,
     as: 'chapters',
-    // attributes: ['id', 'name', 'slug', 'created_at'],
     order: [['id', 'DESC']],
     limit: 3,
     separate: true,
@@ -81,9 +78,8 @@ const getStoryList = asyncHandler(async (req, res) => {
     const sortColumn = sortWhitelist.includes(String(sort)) ? String(sort) : 'id'
     orderClause = [[sortColumn, sortOrder]]
   } else if (sort === 'view_all') {
-    // dùng counter tổng có sẵn
     orderClause = [
-      [Story.sequelize.literal('total_view'), sortOrder],
+      ['total_view', sortOrder],
       ['updated_at', 'DESC'],
       ['id', 'DESC']
     ]
@@ -110,7 +106,6 @@ const getStoryList = asyncHandler(async (req, res) => {
     limit: parseInt(limit, 10),
     offset: parseInt(offset, 10),
     distinct: true,
-    // subQuery: false,
   })
 
   const totalPages = Math.ceil(result.count / parseInt(limit, 10))
@@ -170,7 +165,7 @@ const getStoryDetail = asyncHandler(async (req, res) => {
     const ex = await UserFollow.findOne({
       where: { user_id: userId, story_id: id },
       attributes: ['user_id'],
-      raw: true,
+      raw: true, //Bảo Sequelize trả về object thuần, không bọc trong instance của Model
     })
     is_followed = !!ex
   }
@@ -214,8 +209,8 @@ const rateStory = asyncHandler(async (req, res) => {
     const agg = await StoryRating.findOne({
       where: { story_id: storyId },
       attributes: [
-        [fn('AVG', col('rating')), 'avg'],
-        [fn('COUNT', col('*')), 'cnt'],
+        [fn('AVG', col('rating')), 'avg'], //trung bình cộng của cột rating
+        [fn('COUNT', col('*')), 'cnt'], //Tổng lượt rating của truyện đó
       ],
       raw: true,
       transaction: t,

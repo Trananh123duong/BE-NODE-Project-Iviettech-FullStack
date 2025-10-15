@@ -50,10 +50,8 @@ const getChapterDetail = asyncHandler(async (req, res) => {
     include: [
       {
         model: ChapterImage,
-        as: 'chapter_images',
+        as: 'chapter_images',  //Alias của quan hệ, lưu trong init-models
         attributes: ['id', 'img_path', 'img_type', 'sort_order'],
-        required: false,
-        separate: true,
         order: [
           ['sort_order', 'ASC'],
           ['id', 'ASC'],
@@ -63,11 +61,11 @@ const getChapterDetail = asyncHandler(async (req, res) => {
   })
   if (!chapter) throw new NotFoundError('Không tìm thấy chapter')
 
-  const [prevChapter, nextChapter, story] = await Promise.all([
+  const [prevChapter, nextChapter, story] = await Promise.all([ //Nhận vào mảng Promises và chạy đồng thời
     Chapter.findOne({
       where: {
         story_id: chapter.story_id,
-        chapter_number: { [Op.lt]: chapter.chapter_number },
+        chapter_number: { [Op.lt]: chapter.chapter_number }, //Less Than – nhỏ hơn '<'
       },
       attributes: ['id'],
       order: [
@@ -78,7 +76,7 @@ const getChapterDetail = asyncHandler(async (req, res) => {
     Chapter.findOne({
       where: {
         story_id: chapter.story_id,
-        chapter_number: { [Op.gt]: chapter.chapter_number },
+        chapter_number: { [Op.gt]: chapter.chapter_number }, //Greater Than – lớn hơn '>'
       },
       attributes: ['id'],
       order: [
@@ -93,14 +91,14 @@ const getChapterDetail = asyncHandler(async (req, res) => {
     story_id: chapter.story_id,
     user_id: userId,
   })
-  await Story.increment('total_view', {
+  await Story.increment('total_view', { //👉 Tăng cột total_view trong bảng stories lên 1 đơn vị
     by: 1,
     where: { id: chapter.story_id },
   })
 
   let is_following = false
   if (userId) {
-    await ReadingHistory.upsert({
+    await ReadingHistory.upsert({ //Tạo mới hoặc cập nhật keo index uk_user_story
       user_id: userId,
       story_id: chapter.story_id,
       chapter_id: chapter.id,
@@ -123,7 +121,6 @@ const getChapterDetail = asyncHandler(async (req, res) => {
   })
 })
 
-// Lấy danh sách bình luận theo chapter (kèm reply 1 cấp)
 const getChapterComments = asyncHandler(async (req, res) => {
   const { page = 1, limit = 20, order = 'desc' } = req.query
   const chapterId = Number(req.params.id)
@@ -266,7 +263,6 @@ const createChapterComment = asyncHandler(async (req, res) => {
   return res.status(201).json(newComment)
 })
 
-// Xoá mềm bình luận
 const deleteComment = asyncHandler(async (req, res) => {
   const id = Number(req.params.id)
   const userId = req.user?.id
@@ -281,7 +277,7 @@ const deleteComment = asyncHandler(async (req, res) => {
   }
 
   await Story.sequelize.transaction(async (t) => {
-    await comment.destroy({ transaction: t }) // paranoid: true → xoá mềm
+    await comment.destroy({ transaction: t })
 
     // cập nhật lại đếm
     const [storyCount, chapterCount] = await Promise.all([

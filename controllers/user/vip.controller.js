@@ -23,10 +23,6 @@ function calcNextWindow(curExpire, durationDays = 30) {
   return { start, end }
 }
 
-/**
- * GET api/vip/status
- * Trả về tình trạng VIP hiện tại của user
- */
 const getVipStatus = asyncHandler(async (req, res) => {
   const userId = req.user.id
   const user = await User.findByPk(userId, { attributes: ['id', 'vip_started_at', 'vip_expires_at'] })
@@ -41,11 +37,6 @@ const getVipStatus = asyncHandler(async (req, res) => {
   })
 })
 
-/**
- * POST api/vip/checkout
- * Thanh toán ảo: bấm là "PAID" và cộng dồn 30 ngày
- * Body (tùy chọn): { price?: number, note?: string }
- */
 const fakeCheckout = asyncHandler(async (req, res) => {
   const userId = req.user.id
   const PRICE = Number.isFinite(+req.body?.price) ? Math.max(0, +req.body.price) : 49000

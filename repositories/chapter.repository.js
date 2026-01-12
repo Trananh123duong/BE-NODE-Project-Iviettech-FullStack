@@ -93,6 +93,13 @@ class ChapterRepository extends BaseRepository {
       last_read_at: new Date(),
     });
   }
+
+  async findByStoryAndNumber(storyId, chapterNumber) {
+    return await this.model.findOne({
+      where: { story_id: storyId, chapter_number: chapterNumber },
+      attributes: ['id', 'chapter_number']
+    });
+  }
 }
 
 module.exports = new ChapterRepository();

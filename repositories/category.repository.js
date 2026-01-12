@@ -12,6 +12,10 @@ class CategoryRepository extends BaseRepository {
       order: [['id', 'ASC']],
     });
   }
+
+  async findByName(name) {
+    return await this.model.findOne({ where: { name } });
+  }
 }
 
 module.exports = new CategoryRepository();

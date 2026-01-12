@@ -1,10 +1,17 @@
-// services/crawler.service.js
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
-const models = require('../models');
 const { ApiError, NotFoundError, BadRequestError } = require('../utils/ApiError');
 const crypto = require('crypto');
+
+const CategoryRepository = require('../repositories/category.repository');
+const StoryRepository = require('../repositories/story.repository');
+const ChapterRepository = require('../repositories/chapter.repository');
+const ChapterImageRepository = require('../repositories/chapter_image.repository');
+// Note: We still access models for some transactional or specific create logic if Repo is generic.
+// But we should use Repo methods where available.
+// For 'create', BaseRepo has it.
+// For 'update', BaseRepo has it (by id). 
 
 const OTRUYEN_API = 'https://otruyenapi.com/v1/api';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -12,10 +19,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function safeSlug(s = '') {
   return String(s)
     .toLowerCase()
-    .replace(/[^a-z0-9\-]+/g, '-') // chỉ giữ a-z, 0-9, dấu -
-    .replace(/-+/g, '-')           // gộp nhiều dấu -
-    .replace(/^-+|-+$/g, '')       // bỏ - ở đầu/cuối
-    .slice(0, 80);                 // tránh quá dài
+    .replace(/[^a-z0-9\-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
 }
 
 async function downloadImageTo(fileUrl, outPath) {
@@ -38,41 +45,32 @@ async function downloadImageTo(fileUrl, outPath) {
 async function findOrCreateCategories(names) {
   const ids = [];
   for (const name of names || []) {
-    let cat = await models.categories.findOne({ where: { name }, attributes: ['id'] });
-    if (!cat) cat = await models.categories.create({ name });
+    let cat = await CategoryRepository.findByName(name);
+    if (!cat) {
+        cat = await CategoryRepository.create({ name });
+    }
     ids.push(cat.id);
   }
   return ids;
 }
 
 async function attachStoryCategories(storyId, categoryIds) {
-  if (!models.story_categories) return;
   for (const cid of categoryIds) {
-    const exists = await models.story_categories.findOne({
-      where: { story_id: storyId, category_id: cid },
-      attributes: ['story_id']
-    });
-    if (!exists) {
-      await models.story_categories.create({ story_id: storyId, category_id: cid });
-    }
+    await StoryRepository.addCategory(storyId, cid);
   }
 }
 
 async function ensureStoryFromDetail(storyDetail, slug) {
-  // 1) Categories
   const categoryNames = storyDetail.item.category?.map((c) => c.name) || [];
   const categoryIds = await findOrCreateCategories(categoryNames);
 
-  // 2) Story
   const author = Array.isArray(storyDetail.item.author)
     ? storyDetail.item.author.join(', ')
     : (storyDetail.item.author || '');
 
-  let story = await models.stories.findOne({
-    where: { name: storyDetail.item.name }
-  });
+  let story = await StoryRepository.findByName(storyDetail.item.name);
   if (!story) {
-    story = await models.stories.create({
+    story = await StoryRepository.create({
       name: storyDetail.item.name,
       author,
       description: storyDetail.item.content || null,
@@ -81,10 +79,8 @@ async function ensureStoryFromDetail(storyDetail, slug) {
     });
   }
 
-  // 3) Story-Categories
   await attachStoryCategories(story.id, categoryIds);
 
-  // 4) Thumbnail (best-effort)
   const thumb = storyDetail.seoOnPage?.seoSchema?.image;
   if (thumb && !story.thumbnail) {
     try {
@@ -96,10 +92,7 @@ async function ensureStoryFromDetail(storyDetail, slug) {
       const rel = path.join('uploads', 'thumbnails', fileName);
       await downloadImageTo(thumb, path.join(process.cwd(), rel));
 
-      await models.stories.update(
-        { thumbnail: `/${rel.replace(/\\+/g, '/')}` },
-        { where: { id: story.id } }
-      );
+      await StoryRepository.update(story.id, { thumbnail: `/${rel.replace(/\\+/g, '/')}` });
     } catch (e) {
       console.warn(`Thumbnail error [${story.id}]:`, e?.message || e);
     }
@@ -117,10 +110,7 @@ async function crawlChapterImages(chapterApiUrl, chapterId) {
   const chapterPath = String(data.item.chapter_path || '').replace(/^\/|\/$/g, '');
   const list = data.item.chapter_image || [];
 
-  // Lấy sort_order bắt đầu (append tiếp)
-  const lastSort = await models.chapter_images.max('sort_order', {
-    where: { chapter_id: chapterId },
-  });
+  const lastSort = await ChapterImageRepository.getMaxSortOrder(chapterId);
   let base = Number.isFinite(lastSort) ? Number(lastSort) + 1 : 0;
 
   let created = 0;
@@ -128,13 +118,10 @@ async function crawlChapterImages(chapterApiUrl, chapterId) {
     const img = list[i];
     const fullUrl = `${domain}/${chapterPath}/${img.image_file}`;
 
-    const exists = await models.chapter_images.findOne({
-      where: { chapter_id: chapterId, img_path: fullUrl },
-      attributes: ['id'],
-    });
+    const exists = await ChapterImageRepository.findByPath(chapterId, fullUrl);
 
     if (!exists) {
-      await models.chapter_images.create({
+      await ChapterImageRepository.create({
         chapter_id: chapterId,
         img_path: fullUrl,
         img_type: 'EXTERNAL',
@@ -147,12 +134,6 @@ async function crawlChapterImages(chapterApiUrl, chapterId) {
   return created;
 }
 
-/**
- * Crawl đúng 1 chapter theo slug + chapterNumber (khớp với item.server_data[].chapter_name)
- * @param {string} slug
- * @param {number|string} chapterNumber - ví dụ 1, 12, 12.5
- * @returns { story_id, chapter_id, chapter_number, images_added }
- */
 async function crawlSingleChapter(slug, chapterNumber) {
   const raw = String(chapterNumber ?? '').trim();
   if (!slug?.trim()) throw new BadRequestError('Thiếu slug');
@@ -163,7 +144,6 @@ async function crawlSingleChapter(slug, chapterNumber) {
     throw new BadRequestError('chapterNumber không hợp lệ (phải là số, ví dụ 1, 12, 12.5)');
   }
 
-  // 1) Lấy detail từ API để tìm chapter tương ứng
   let storyDetail;
   try {
     const response = await axios.get(`${OTRUYEN_API}/truyen-tranh/${slug}`);
@@ -174,7 +154,6 @@ async function crawlSingleChapter(slug, chapterNumber) {
   }
   if (!storyDetail?.item) throw new NotFoundError(`Không tìm thấy truyện với slug: ${slug}`);
 
-  // 2) Tìm chapter khớp chapter_name ~ targetNum (duyệt tất cả server)
   let found = null;
   for (const server of storyDetail.item.chapters || []) {
     for (const ch of server.server_data || []) {
@@ -193,29 +172,22 @@ async function crawlSingleChapter(slug, chapterNumber) {
     throw new NotFoundError(`Chapter ${targetNum} không có dữ liệu ảnh (chapter_api_data rỗng)`);
   }
 
-  // 3) Đảm bảo story tồn tại (không tạo các chapter khác)
   const story = await ensureStoryFromDetail(storyDetail, slug);
 
-  // 4) Tạo/tìm chapter hiện tại
-  let chapter = await models.chapters.findOne({
-    where: { story_id: story.id, chapter_number: targetNum },
-    attributes: ['id', 'chapter_number']
-  });
+  let chapter = await ChapterRepository.findByStoryAndNumber(story.id, targetNum);
   if (!chapter) {
-    chapter = await models.chapters.create({
+    chapter = await ChapterRepository.create({
       story_id: story.id,
       chapter_number: targetNum,
       title: found.chapter_title || ''
     });
   }
 
-  // 5) Crawl ảnh cho đúng chapter này
   let images_added = 0;
   try {
     images_added = await crawlChapterImages(found.chapter_api_data, chapter.id);
   } catch (e) {
     console.warn(`Chapter images error [chapter=${chapter.id}]:`, e?.message || e);
-    // Cho phép trả về dù không thêm được ảnh
   }
 
   return {
@@ -229,7 +201,6 @@ async function crawlSingleChapter(slug, chapterNumber) {
 async function crawlStoryDetail(slug) {
   if (!slug?.trim()) throw new BadRequestError('Thiếu slug');
 
-  // 1) Lấy detail từ API
   let storyDetail;
   try {
     const response = await axios.get(`${OTRUYEN_API}/truyen-tranh/${slug}`);
@@ -240,64 +211,16 @@ async function crawlStoryDetail(slug) {
   }
   if (!storyDetail?.item) throw new NotFoundError(`Không tìm thấy truyện với slug: ${slug}`);
 
-  // 2) Categories
-  const categoryNames = storyDetail.item.category?.map((c) => c.name) || [];
-  const categoryIds = await findOrCreateCategories(categoryNames);
+  const story = await ensureStoryFromDetail(storyDetail, slug);
 
-  // 3) Story
-  const author = Array.isArray(storyDetail.item.author)
-    ? storyDetail.item.author.join(', ')
-    : (storyDetail.item.author || '');
-
-  let story = await models.stories.findOne({
-    where: { name: storyDetail.item.name }
-  });
-  if (!story) {
-    story = await models.stories.create({
-      name: storyDetail.item.name,
-      author,
-      description: storyDetail.item.content || null,
-      status: storyDetail.item.status || 'ONGOING',
-      thumbnail: null
-    });
-  }
-
-  // 4) Story-Categories
-  await attachStoryCategories(story.id, categoryIds);
-
-  // 5) Thumbnail (không ảnh hưởng data core nếu lỗi)
-  const thumb = storyDetail.seoOnPage?.seoSchema?.image;
-  if (thumb) {
-    try {
-      const ext = path.extname(thumb).split('?')[0] || '.jpg';
-      const baseSlug = safeSlug(slug);
-      const rand = crypto.randomBytes(4).toString('hex'); // ví dụ "a1b2c3d4"
-      const fileName = `${baseSlug}-${rand}${ext}`;
-
-      const rel = path.join('uploads', 'thumbnails', fileName);
-      await downloadImageTo(thumb, path.join(process.cwd(), rel));
-
-      await models.stories.update(
-        { thumbnail: `/${rel.replace(/\\+/g, '/')}` },
-        { where: { id: story.id } }
-      );
-    } catch (e) {
-      console.warn(`Thumbnail error [${story.id}]:`, e?.message || e);
-    }
-  }
-
-  // 6) Chapters + images (mỗi chapter tự xử; lỗi chapter nào bỏ chapter đó)
   for (const server of storyDetail.item.chapters || []) {
     for (const ch of server.server_data || []) {
       const chNumber = parseFloat(ch.chapter_name);
       if (!Number.isFinite(chNumber)) continue;
 
-      let chapter = await models.chapters.findOne({
-        where: { story_id: story.id, chapter_number: chNumber },
-        attributes: ['id']
-      });
+      let chapter = await ChapterRepository.findByStoryAndNumber(story.id, chNumber);
       if (!chapter) {
-        chapter = await models.chapters.create({
+        chapter = await ChapterRepository.create({
           story_id: story.id,
           chapter_number: chNumber,
           title: ch.chapter_title || ''

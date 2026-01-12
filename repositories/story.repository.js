@@ -133,6 +133,22 @@ class StoryRepository extends BaseRepository {
       ],
     });
   }
+
+  async findByName(name) {
+    return await this.findOne({ where: { name } });
+  }
+
+  async addCategory(storyId, categoryId) {
+    // Check if link exists
+    const { story_categories } = require('../models');
+    const exists = await story_categories.findOne({
+      where: { story_id: storyId, category_id: categoryId },
+      attributes: ['story_id']
+    });
+    if (!exists) {
+      await story_categories.create({ story_id: storyId, category_id: categoryId });
+    }
+  }
 }
 
 module.exports = new StoryRepository();

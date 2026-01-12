@@ -1,366 +1,42 @@
-const { fn, col, Op } = require('sequelize')
-const asyncHandler = require('express-async-handler')
-const { ApiError, NotFoundError } = require('../../utils/ApiError')
-
-const {
-  stories: Story,
-  categories: Category,
-  chapters: Chapter,
-  user_follows: UserFollow,
-  story_ratings: StoryRating,
-  story_comments: StoryComment,
-  comment_likes: CommentLike,
-  users: User,
-} = require('../../models')
+const asyncHandler = require('express-async-handler');
+const StoryService = require('../../services/story.service');
 
 const getStoryList = asyncHandler(async (req, res) => {
-  const {
-    page = 1,
-    limit = 10,
-    sort = 'id',
-    order = 'desc',
-    keyword,
-    status,
-  } = req.query
-  const categoryIds = req.query['categoryIds[]']
-  const offset = (page - 1) * limit
-
-  let whereClause = {}
-  if (keyword) {
-    whereClause.name = { [Op.like]: `%${keyword}%` }
-  }
-
-  // lọc theo status trạng thái
-  const ALLOWED_STATUS = ['coming_soon', 'ongoing', 'completed']
-  if (status && ALLOWED_STATUS.includes(status)) {
-    whereClause.status = status
-  }
-
-  // include mặc định (không lọc theo category)
-  let categoryInclude = {
-    model: Category,
-    as: 'category_id_categories',
-    attributes: ['id', 'name'],
-    through: { attributes: [] }, // ẩn cột bảng trung gian
-    required: false, //Story nào không có Category vẫn hiện ra.
-  }
-
-  // nếu có categoryIds[] thì lọc many-to-many qua include.where
-  if (categoryIds) {
-    const ids = Array.isArray(categoryIds) ? categoryIds : [categoryIds]
-    const safeIds = ids.map((v) => Number(v)).filter(Number.isInteger)
-
-    if (safeIds.length) {
-      categoryInclude = {
-        ...categoryInclude,
-        where: { id: { [Op.in]: safeIds } },
-        required: true, // chỉ muốn lấy những Story có category id nằm trong safeIds
-      }
-    }
-  }
-
-  // include 3 chương mới nhất cho MỖI story
-  const chapterInclude = {
-    model: Chapter,
-    as: 'chapters',
-    order: [['id', 'DESC']],
-    limit: 3,
-    separate: true,
-    required: false,
-  }
-
-  const sortOrder = String(order).toLowerCase() === 'desc' ? 'DESC' : 'ASC'
-  const sortWhitelist = ['id', 'name', 'total_view', 'total_follow', 'created_at', 'updated_at']
-  const isViewSort = sort === 'view_day' || sort === 'view_week' || sort === 'view_month' || sort === 'view_all'
-
-  let orderClause
-  if (!isViewSort) {
-    const sortColumn = sortWhitelist.includes(String(sort)) ? String(sort) : 'id'
-    orderClause = [[sortColumn, sortOrder]]
-  } else if (sort === 'view_all') {
-    orderClause = [
-      ['total_view', sortOrder],
-      ['updated_at', 'DESC'],
-      ['id', 'DESC']
-    ]
-  } else {
-    const start = getStartAt(sort)
-    const startStr = new Date(start).toISOString().slice(0, 19).replace('T', ' ')
-    const escStart = Story.sequelize.escape(startStr)
-
-    const expr = `(SELECT COUNT(*) FROM story_views sv
-                  WHERE sv.story_id = stories.id
-                    AND sv.created_at >= ${escStart})`
-    
-    orderClause = [
-      [Story.sequelize.literal(expr), sortOrder],
-      ['updated_at', 'DESC'],
-      ['id', 'DESC']
-    ]
-  }
-
-  const result = await Story.findAndCountAll({
-    where: whereClause,
-    include: [categoryInclude, chapterInclude],
-    order: orderClause,
-    limit: parseInt(limit, 10),
-    offset: parseInt(offset, 10),
-    distinct: true,
-  })
-
-  const totalPages = Math.ceil(result.count / parseInt(limit, 10))
-
-  return res.status(200).json({
-    data: result.rows,
-    meta: {
-      total: result.count,
-      page: parseInt(page, 10),
-      limit: parseInt(limit, 10),
-      totalPages,
-    },
-  })
-})
-
-function getStartAt(key) {
-  const now = new Date()
-  if (key === 'view_day') {
-    const d = new Date(now);
-    d.setHours(0, 0, 0, 0);
-    return d
-  }
-  if (key === 'view_week') {
-    const d = new Date(now)
-    const day = (d.getDay() + 6) % 7 // Monday=0
-    d.setDate(d.getDate() - day);
-    d.setHours(0, 0, 0, 0);
-    return d
-  }
-  if (key === 'view_month') {
-    const d = new Date(now.getFullYear(), now.getMonth(), 1)
-    d.setHours(0, 0, 0, 0);
-    return d
-  }
-  return null
-}
+  const result = await StoryService.getStoryList(req.query);
+  res.status(200).json(result);
+});
 
 const getStoryDetail = asyncHandler(async (req, res) => {
-  const { id } = req.params
-  const userId = req.user?.id || null
+  const { id } = req.params;
+  const userId = req.user?.id || null;
+  const result = await StoryService.getStoryDetail(id, userId);
+  res.status(200).json(result);
+});
 
-  const story = await Story.findByPk(id, {
-    include: [
-      {
-        model: Category,
-        as: 'category_id_categories',
-        attributes: ['id', 'name'],
-        through: { attributes: [] },
-        required: false,
-      },
-    ],
-  })
-  if (!story) throw new NotFoundError('Không tìm thấy truyện')
-
-  let is_followed = false
-  if (userId) {
-    const ex = await UserFollow.findOne({
-      where: { user_id: userId, story_id: id },
-      attributes: ['user_id'],
-      raw: true, //Bảo Sequelize trả về object thuần, không bọc trong instance của Model
-    })
-    is_followed = !!ex
-  }
-
-  const payload = story.toJSON()
-  payload.is_followed = is_followed
-
-  return res.status(200).json(payload)
-})
-
-// Upsert chấm sao truyện + cập nhật avg & count
 const rateStory = asyncHandler(async (req, res) => {
-  const storyId = Number(req.params.id)
-  const userId = req.user?.id
-  const { rating } = req.body
+  const storyId = Number(req.params.id);
+  const userId = req.user?.id;
+  const { rating } = req.body;
 
-  if (!userId) throw new ApiError(401, 'Cần đăng nhập')
+  const result = await StoryService.rateStory(storyId, userId, rating);
+  res.status(200).json(result);
+});
 
-  const r = Number(rating)
-  if (!Number.isInteger(r) || r < 1 || r > 5) {
-    throw new ApiError(400, 'rating phải trong khoảng 1..5')
-  }
-
-  const story = await Story.findByPk(storyId)
-  if (!story) throw new NotFoundError('Không tìm thấy truyện')
-
-  await Story.sequelize.transaction(async (t) => {
-    // upsert rating
-    const [row, created] = await StoryRating.findOrCreate({
-      where: { story_id: storyId, user_id: userId },
-      defaults: { story_id: storyId, user_id: userId, rating: r },
-      transaction: t,
-    })
-
-    if (!created && row.rating !== r) {
-      row.rating = r
-      await row.save({ transaction: t })
-    }
-
-    // tính lại avg & count rồi cập nhật vào stories
-    const agg = await StoryRating.findOne({
-      where: { story_id: storyId },
-      attributes: [
-        [fn('AVG', col('rating')), 'avg'], //trung bình cộng của cột rating
-        [fn('COUNT', col('*')), 'cnt'], //Tổng lượt rating của truyện đó
-      ],
-      raw: true,
-      transaction: t,
-    })
-
-    const avg = Number(agg.avg || 0).toFixed(2)
-    const cnt = Number(agg.cnt || 0)
-
-    await Story.update(
-      { avg_rating: avg, ratings_count: cnt },
-      { where: { id: storyId }, transaction: t }
-    )
-  })
-
-  return res.status(200).json({ message: 'Đã ghi nhận đánh giá' })
-})
-
-// Lấy tổng quan rating (avg, count, phân phối 1..5)
 const getRatingSummary = asyncHandler(async (req, res) => {
-  const storyId = Number(req.params.id)
-  const userId = req.user?.id || null
+  const storyId = Number(req.params.id);
+  const userId = req.user?.id || null;
 
-  const story = await Story.findByPk(storyId, {
-    attributes: ['id', 'avg_rating', 'ratings_count']
-  })
-  if (!story) throw new NotFoundError('Không tìm thấy truyện')
+  const result = await StoryService.getRatingSummary(storyId, userId);
+  res.status(200).json(result);
+});
 
-  // phân phối 1..5
-  const dist = await StoryRating.findAll({
-    where: { story_id: storyId },
-    attributes: ['rating', [fn('COUNT', col('*')), 'count']],
-    group: ['rating'],
-    raw: true,
-  })
-
-  const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
-  for (const r of dist) distribution[String(r.rating)] = Number(r.count)
-
-  // rating của user hiện tại (nếu đăng nhập)
-  let user_rating = null
-  if (userId) {
-    const r = await StoryRating.findOne({
-      where: { story_id: storyId, user_id: userId },
-      attributes: ['rating'],
-      raw: true,
-    })
-    user_rating = r ? Number(r.rating) : null
-  }
-
-  return res.status(200).json({
-    story_id: story.id,
-    avg_rating: Number(story.avg_rating),
-    ratings_count: Number(story.ratings_count),
-    distribution,
-    user_rating,
-  })
-})
-
-// Lấy bình luận theo truyện (gộp tất cả chapter) + liked & likes_count
 const getStoryComments = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 20, order = 'desc' } = req.query
-  const storyId = Number(req.params.id)
-  const userId = req.user?.id ? Number(req.user.id) : null
+  const storyId = Number(req.params.id);
+  const userId = req.user?.id ? Number(req.user.id) : null;
 
-  const story = await Story.findByPk(storyId, { attributes: ['id'] })
-  if (!story) throw new NotFoundError('Không tìm thấy truyện')
-
-  const offset = (Number(page) - 1) * Number(limit)
-  const orderClause = String(order).toLowerCase() === 'asc' ? 'ASC' : 'DESC'
-
-  // 1) Lấy comment gốc + reply 1 cấp
-  const { rows, count } = await StoryComment.findAndCountAll({
-    where: { story_id: storyId, parent_id: null },
-    include: [
-      { model: User, as: 'user', attributes: ['id', 'username', 'avatar'] },
-      {
-        model: StoryComment,
-        as: 'story_comments',
-        include: [{ model: User, as: 'user', attributes: ['id', 'username', 'avatar'] }],
-        separate: true,
-        order: [['created_at', 'ASC'], ['id', 'ASC']],
-      },
-    ],
-    order: [['created_at', orderClause], ['id', orderClause]],
-    limit: Number(limit),
-    offset,
-    distinct: true,
-  })
-
-  // 2) Gom tất cả ID (cha + reply)
-  const allIds = []
-  for (const c of rows) {
-    allIds.push(c.id)
-    if (Array.isArray(c.story_comments)) {
-      for (const r of c.story_comments) allIds.push(r.id)
-    }
-  }
-
-  // 3) Lấy map đếm like và set các comment user đã like
-  let likeCountMap = new Map()
-  let likedSet = new Set()
-
-  if (allIds.length > 0) {
-    // 3a) Tổng like theo comment_id
-    const likeCounts = await CommentLike.findAll({
-      where: { comment_id: { [Op.in]: allIds } },
-      attributes: ['comment_id', [CommentLike.sequelize.fn('COUNT', CommentLike.sequelize.col('*')), 'cnt']],
-      group: ['comment_id'],
-      raw: true,
-    })
-    for (const row of likeCounts) {
-      likeCountMap.set(Number(row.comment_id), Number(row.cnt))
-    }
-
-    // 3b) Các comment user hiện tại đã like
-    if (userId) {
-      const likedRows = await CommentLike.findAll({
-        where: { user_id: userId, comment_id: { [Op.in]: allIds } },
-        attributes: ['comment_id'],
-        raw: true,
-      })
-      likedSet = new Set(likedRows.map(r => Number(r.comment_id)))
-    }
-  }
-
-  // 4) Gắn likes_count + is_liked vào kết quả trả về
-  const data = rows.map((c) => {
-    const parent = c.toJSON()
-    parent.likes_count = likeCountMap.get(c.id) || 0
-    parent.is_liked = likedSet.has(c.id)
-
-    parent.story_comments = (parent.story_comments || []).map((r) => ({
-      ...r,
-      likes_count: likeCountMap.get(r.id) || 0,
-      is_liked: likedSet.has(r.id),
-    }))
-
-    return parent
-  })
-
-  return res.status(200).json({
-    data,
-    meta: {
-      total: count,
-      page: Number(page),
-      limit: Number(limit),
-      totalPages: Math.ceil(count / Number(limit)),
-    },
-  })
-})
+  const result = await StoryService.getStoryComments(storyId, req.query, userId);
+  res.status(200).json(result);
+});
 
 module.exports = {
   getStoryList,
@@ -368,4 +44,4 @@ module.exports = {
   rateStory,
   getRatingSummary,
   getStoryComments,
-}
+};
